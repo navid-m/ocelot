@@ -1,5 +1,5 @@
-﻿using Ocelot.Server;
-using Ocelot.Test;
+﻿using Ocelot.Meta.Test;
+using Ocelot.Server;
 
 class Program
 {
