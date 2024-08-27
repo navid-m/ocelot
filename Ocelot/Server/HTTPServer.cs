@@ -28,7 +28,6 @@ public class HTTPServer
         {
             _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
             _listenerSocket.ReceiveBufferSize = 32768;
-            _listenerSocket.Listen(1024);
         }
         catch (Exception e)
         {
@@ -95,7 +94,7 @@ public class HTTPServer
 
     public async Task StartAsync()
     {
-        _listenerSocket.Listen(512);
+        _listenerSocket.Listen(1024);
 
         Console.WriteLine($"Server started on: http://{ipAddress}:{port}\n");
 
