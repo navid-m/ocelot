@@ -128,7 +128,7 @@ public class HTTPServer
         try
         {
             using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
-            var buffer = new byte[2048];
+            var buffer = new byte[4096];
             int bytesRead = await networkStream.ReadAsync(buffer);
 
             if (bytesRead == 0)
