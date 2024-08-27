@@ -1,6 +1,6 @@
 namespace Ocelot.Responses;
 
-public class PlaintextResponse(string textContent) : ResponseType
+public class PlaintextResponse(string textContent) : Response
 {
     private readonly string _textContent = textContent;
 

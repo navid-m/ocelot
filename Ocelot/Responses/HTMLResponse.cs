@@ -2,7 +2,7 @@ using System.Text;
 
 namespace Ocelot.Responses;
 
-public class HTMLResponse(string htmlContent) : ResponseType
+public class HTMLResponse(string htmlContent) : Response
 {
     private readonly string _htmlContent = htmlContent;
 

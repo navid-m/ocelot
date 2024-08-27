@@ -26,18 +26,18 @@ public class HTTPServer(string ipAddress, int port)
             {
                 _routes[attribute.Route] = () =>
                 {
-                    var response = (ResponseType)method.Invoke(instance, null)!;
+                    var response = (Response)method.Invoke(instance, null)!;
                     return GenerateHttpResponse(response);
                 };
             }
         }
     }
 
-    private static byte[] GenerateHttpResponse(ResponseType responseType)
+    private static byte[] GenerateHttpResponse(Response response)
     {
-        var content = responseType.GetContent();
+        var content = response.GetContent();
         var headers = Encoding.UTF8.GetBytes(
-            $"HTTP/1.1 200 OK\r\nContent-Type: {responseType.ContentType}\r\nContent-Length: {content.Length}\r\nConnection: close\r\n\r\n"
+            $"HTTP/1.1 200 OK\r\nContent-Type: {response.ContentType}\r\nContent-Length: {content.Length}\r\nConnection: close\r\n\r\n"
         );
         return CombineHeadersAndResponse(headers, content);
     }
