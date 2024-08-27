@@ -9,17 +9,16 @@ internal class Template(string template)
     public string Render(TemplateContext context)
     {
         return Expressions
-            .PlaceholderRegex()
+            .TemplateValueRegex()
             .Replace(
                 _template,
                 match =>
                 {
-                    var variableName = match.Groups[1].Value;
-                    if (context.TryGetValue(variableName, out var value))
+                    if (context.TryGetValue(match.Groups[1].Value, out var value))
                     {
                         if (value != null)
                         {
-                            return value.ToString() ?? "";
+                            return value.ToString() ?? string.Empty;
                         }
                     }
                     return match.Value;

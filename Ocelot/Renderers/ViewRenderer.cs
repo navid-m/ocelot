@@ -1,5 +1,6 @@
 using Ocelot.Renderers.Internal;
 using Ocelot.Renderers.Models;
+using Ocelot.Reports;
 using Ocelot.Responses;
 
 namespace Ocelot.Renderers;
@@ -23,12 +24,13 @@ public static class ViewRenderer
         string fullViewPath = Path.Join(templatesPath, viewPath);
         if (!File.Exists(fullViewPath))
         {
-            throw new Exception("View path does not exist.");
+            Logger.LogIssue("View path does not exist.");
         }
         if (BladeParser.TryParse(File.ReadAllText(fullViewPath), out var template, out var error))
         {
             return new HTMLResponse(template.Render(new TemplateContext(model)));
         }
-        throw new Exception($"Issue parsing template: {error}");
+        Logger.LogIssue(errorMessage: $"Issue parsing template: {error}", fatal: true);
+        return new HTMLResponse(string.Empty);
     }
 }
