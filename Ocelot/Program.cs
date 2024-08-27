@@ -3,7 +3,7 @@ using Ocelot.Server;
 
 class Program
 {
-    static async Task Main(string[] args)
+    static async Task Main()
     {
         var server = new HTTPServer("127.0.0.1", 8080);
         server.RegisterRoutes<ExampleController>();

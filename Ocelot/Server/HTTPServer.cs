@@ -15,8 +15,8 @@ public class HTTPServer
         new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
     private readonly Dictionary<string, Func<byte[]>> _routes = [];
     private StaticFileMiddleware? _staticFileMiddleware;
-    private string ipAddress;
-    private int port;
+    private readonly string ipAddress;
+    private readonly int port;
 
     public HTTPServer(string ipAddress, int port)
     {
