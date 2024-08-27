@@ -1,7 +1,7 @@
 using Ocelot.Responses;
 using Ocelot.Server;
 
-namespace Ocelot.Test;
+namespace Ocelot.Meta.Test;
 
 public class ExampleController
 {
