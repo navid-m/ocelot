@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Ocelot.Server;
 
-public class OcelotServer(string ipAddress, int port)
+public class HTTPServer(string ipAddress, int port)
 {
     private readonly TcpListener _listener = new(IPAddress.Parse(ipAddress), port);
     private readonly Dictionary<string, Func<string>> _routes = [];
@@ -14,8 +14,7 @@ public class OcelotServer(string ipAddress, int port)
         where T : new()
     {
         var instance = new T();
-        var methods = typeof(T).GetMethods();
-        foreach (var method in methods)
+        foreach (var method in typeof(T).GetMethods())
         {
             var attribute = method.GetCustomAttribute<GetAttribute>();
             if (attribute != null)
@@ -32,7 +31,7 @@ public class OcelotServer(string ipAddress, int port)
             $@"
 Server started on: 
 http://{((IPEndPoint)_listener.LocalEndpoint).Address}:{((IPEndPoint)_listener.LocalEndpoint).Port}
-            "
+"
         );
 
         while (true)
@@ -44,21 +43,24 @@ http://{((IPEndPoint)_listener.LocalEndpoint).Address}:{((IPEndPoint)_listener.L
 
     private async Task ProcessClientAsync(TcpClient client)
     {
-        using (var networkStream = client.GetStream())
+        try
         {
-            byte[] buffer = new byte[1024];
-            int bytesRead = await networkStream.ReadAsync(buffer);
-            string request = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            using var networkStream = client.GetStream();
+            var buffer = new byte[8192];
+            var bytesRead = await networkStream.ReadAsync(buffer);
+            var request = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+
             Console.WriteLine($"Received request:\n{request}");
 
-            string[] requestLines = request.Split('\n');
-            string[] requestParts = requestLines[0].Split(' ');
+            var requestLines = request.Split('\n');
+            var requestParts = requestLines[0].Split(' ');
+
             if (requestParts.Length >= 2 && requestParts[0] == "GET")
             {
-                string route = requestParts[1];
+                var route = requestParts[1];
                 if (_routes.TryGetValue(route, out var handler))
                 {
-                    string responseText = handler();
+                    var responseText = handler();
                     await SendResponseAsync(networkStream, "200 OK", "text/plain", responseText);
                 }
                 else
@@ -81,25 +83,37 @@ http://{((IPEndPoint)_listener.LocalEndpoint).Address}:{((IPEndPoint)_listener.L
                 );
             }
         }
-
-        Console.WriteLine("Client disconnected.");
-        client.Close();
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing request: {ex.Message}");
+        }
+        finally
+        {
+            client.Close();
+        }
     }
 
-    private async Task SendResponseAsync(
+    private static async Task SendResponseAsync(
         NetworkStream stream,
         string status,
         string contentType,
         string content
     )
     {
-        string responseHeaders =
+        var headers =
             $"HTTP/1.1 {status}\r\n"
             + $"Content-Type: {contentType}\r\n"
             + $"Content-Length: {content.Length}\r\n"
             + "Connection: close\r\n\r\n";
 
-        byte[] responseBytes = Encoding.UTF8.GetBytes(responseHeaders + content);
-        await stream.WriteAsync(responseBytes);
+        var headersBytes = Encoding.UTF8.GetBytes(headers);
+        var contentBytes = Encoding.UTF8.GetBytes(content);
+
+        using var memoryStream = new MemoryStream(headersBytes.Length + contentBytes.Length);
+        await memoryStream.WriteAsync(headersBytes);
+        await memoryStream.WriteAsync(contentBytes);
+
+        memoryStream.Seek(0, SeekOrigin.Begin);
+        await memoryStream.CopyToAsync(stream);
     }
 }
