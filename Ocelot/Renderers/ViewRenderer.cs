@@ -7,21 +7,18 @@ namespace Ocelot.Renderers;
 
 public static class ViewRenderer
 {
-    private static string templatesPath;
+    private static string TemplatesPath;
+    private static string TemplateExtension;
 
     static ViewRenderer()
     {
-        templatesPath = "Views";
-    }
-
-    public static void SetTemplatePath(string path)
-    {
-        templatesPath = path;
+        TemplatesPath = "Views";
+        TemplateExtension = "blade";
     }
 
     public static HTMLResponse Render(object model, string viewPath)
     {
-        string fullViewPath = Path.Join(templatesPath, viewPath);
+        string fullViewPath = Path.Join(TemplatesPath, viewPath + $".{TemplateExtension}");
         if (!File.Exists(fullViewPath))
         {
             Logger.LogIssue("View path does not exist.");
@@ -33,4 +30,8 @@ public static class ViewRenderer
         Logger.LogIssue(errorMessage: $"Issue parsing template: {error}", fatal: true);
         return new HTMLResponse(string.Empty);
     }
+
+    public static void SetTemplatesPath(string path) => TemplatesPath = path;
+
+    public static void SetTemplateExtension(string ext) => TemplateExtension = ext;
 }
