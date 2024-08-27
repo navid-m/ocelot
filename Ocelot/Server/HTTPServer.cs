@@ -89,10 +89,8 @@ public class HTTPServer
         }
     }
 
-    public void UseStaticFiles(string rootDirectory)
-    {
+    public void UseStaticFiles(string rootDirectory) =>
         _staticFileMiddleware = new StaticFileMiddleware(rootDirectory);
-    }
 
     public async Task StartAsync()
     {
@@ -127,7 +125,7 @@ public class HTTPServer
         try
         {
             using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
-            var buffer = new byte[8192];
+            byte[] buffer = new byte[8192];
             int bytesRead = await networkStream.ReadAsync(buffer);
 
             if (bytesRead == 0)
@@ -155,8 +153,7 @@ public class HTTPServer
             // Use the route with an HttpRequest parameter
             if (_routes.TryGetValue(request.Route, out var handler))
             {
-                var responseBytes = handler(request);
-                await networkStream.WriteAsync(responseBytes);
+                await networkStream.WriteAsync(handler(request));
             }
             else
             {
@@ -199,8 +196,10 @@ public class HTTPServer
         string body = string.Empty;
         if (method == "POST" && headers.TryGetValue("Content-Length", out string? contentLength))
         {
-            int contentStartIndex = requestText.IndexOf("\r\n\r\n") + 4;
-            body = requestText.Substring(contentStartIndex, int.Parse(contentLength));
+            body = requestText.Substring(
+                requestText.IndexOf("\r\n\r\n") + 4,
+                int.Parse(contentLength)
+            );
         }
         return new HttpRequest(route, method, headers, body);
     }
