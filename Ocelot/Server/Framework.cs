@@ -46,14 +46,24 @@ http://{((IPEndPoint)_listener.LocalEndpoint).Address}:{((IPEndPoint)_listener.L
         try
         {
             using var networkStream = client.GetStream();
-            var buffer = new byte[8192];
-            var bytesRead = await networkStream.ReadAsync(buffer);
-            var request = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            using var streamReader = new StreamReader(
+                networkStream,
+                Encoding.UTF8,
+                leaveOpen: true
+            );
+            var requestLine = await streamReader.ReadLineAsync();
+            if (requestLine == null)
+            {
+                await SendResponseAsync(
+                    networkStream,
+                    "400 Bad Request",
+                    "text/plain",
+                    "Bad Request"
+                );
+                return;
+            }
 
-            Console.WriteLine($"Received request:\n{request}");
-
-            var requestLines = request.Split('\n');
-            var requestParts = requestLines[0].Split(' ');
+            string[]? requestParts = requestLine.Split(' ');
 
             if (requestParts.Length >= 2 && requestParts[0] == "GET")
             {
@@ -100,14 +110,14 @@ http://{((IPEndPoint)_listener.LocalEndpoint).Address}:{((IPEndPoint)_listener.L
         string content
     )
     {
-        var headers =
+        string? headers =
             $"HTTP/1.1 {status}\r\n"
             + $"Content-Type: {contentType}\r\n"
             + $"Content-Length: {content.Length}\r\n"
             + "Connection: close\r\n\r\n";
 
-        var headersBytes = Encoding.UTF8.GetBytes(headers);
-        var contentBytes = Encoding.UTF8.GetBytes(content);
+        byte[]? headersBytes = Encoding.UTF8.GetBytes(headers);
+        byte[]? contentBytes = Encoding.UTF8.GetBytes(content);
 
         using var memoryStream = new MemoryStream(headersBytes.Length + contentBytes.Length);
         await memoryStream.WriteAsync(headersBytes);
