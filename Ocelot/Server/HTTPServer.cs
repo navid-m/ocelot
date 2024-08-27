@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Ocelot.Renderers;
+using Ocelot.Reports;
 using Ocelot.Server.Exceptions;
 using Ocelot.Server.Internal;
 using Ocelot.Server.Middleware;
@@ -26,8 +27,14 @@ public class HTTPServer
         this.port = port;
         try
         {
-            _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
             _listenerSocket.ReceiveBufferSize = 32768;
+            _listenerSocket.SetSocketOption(
+                SocketOptionLevel.Socket,
+                SocketOptionName.KeepAlive,
+                true
+            );
+            _listenerSocket.NoDelay = true;
+            _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
         }
         catch (Exception e)
         {
@@ -122,7 +129,7 @@ public class HTTPServer
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Error processing request: {e.Message}\nTrace: {e.StackTrace}");
+            Logger.LogIssue($"Error processing request: {e.Message}\nTrace: {e.StackTrace}");
         }
     }
 
@@ -152,7 +159,6 @@ public class HTTPServer
             }
             i++;
         }
-
         string body = string.Empty;
         if (method == "POST" && headers.TryGetValue("Content-Length", out string? contentLength))
         {
