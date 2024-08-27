@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Ocelot.Renderers;
 using Ocelot.Server.Exceptions;
 using Ocelot.Server.Internal;
 using Ocelot.Server.Middleware;
@@ -30,7 +31,7 @@ public class HTTPServer
         }
         catch (Exception e)
         {
-            throw new AddressInUseException($"The address is already in use: {e}");
+            throw new AddressInUseException($"The address is already in use: {e.Message}");
         }
     }
 
@@ -121,7 +122,7 @@ public class HTTPServer
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Error processing request: {e}");
+            Console.WriteLine($"Error processing request: {e.Message}\nTrace: {e.StackTrace}");
         }
     }
 
@@ -162,6 +163,8 @@ public class HTTPServer
         }
         return new HttpRequest(route, method, headers, body);
     }
+
+    public void UseTemplatePath(string path) => ViewRenderer.SetTemplatePath(path);
 
     private static async Task SendErrorResponse(NetworkStream stream, string status)
     {

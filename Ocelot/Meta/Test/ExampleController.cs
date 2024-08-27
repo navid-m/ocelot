@@ -1,3 +1,4 @@
+using Ocelot.Renderers;
 using Ocelot.Responses;
 using Ocelot.Server;
 using Ocelot.Structures;
@@ -7,7 +8,10 @@ namespace Ocelot.Meta.Test;
 public class HomeController : IController
 {
     [Get("/")]
-    public static HTMLResponse Index() => new("<h1>Hello</h1>");
+    public static HTMLResponse Index()
+    {
+        return ViewRenderer.Render(new { Firstname = "Bill", Lastname = "Gates" }, "index.blade");
+    }
 
     [Get("/json")]
     public static JSONResponse JExample() => new("{\"message\": \"This is a JSON response\"}");

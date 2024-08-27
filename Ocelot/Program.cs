@@ -5,9 +5,12 @@ class Program
 {
     static async Task Main()
     {
-        var server = new HTTPServer("127.0.0.1", 8080);
-        server.RegisterRoutes<HomeController>();
-        server.UseStaticFiles("Meta/Test/Static");
-        await server.StartAsync();
+        var app = new HTTPServer("127.0.0.1", 8080);
+
+        app.RegisterRoutes<HomeController>();
+        app.UseStaticFiles("Meta/Test/Static");
+        app.UseTemplatePath("Meta/Test/Views");
+
+        await app.StartAsync();
     }
 }
