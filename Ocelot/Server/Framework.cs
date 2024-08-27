@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
@@ -10,7 +11,9 @@ public class HTTPServer(string ipAddress, int port)
     private readonly TcpListener _listener = new(IPAddress.Parse(ipAddress), port);
     private readonly Dictionary<string, Func<string>> _routes = [];
 
-    public void RegisterRoutes<T>()
+    public void RegisterRoutes<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)] T
+    >()
         where T : new()
     {
         var instance = new T();
@@ -110,7 +113,7 @@ http://{((IPEndPoint)_listener.LocalEndpoint).Address}:{((IPEndPoint)_listener.L
         string content
     )
     {
-        string? headers =
+        string headers =
             $"HTTP/1.1 {status}\r\n"
             + $"Content-Type: {contentType}\r\n"
             + $"Content-Length: {content.Length}\r\n"
