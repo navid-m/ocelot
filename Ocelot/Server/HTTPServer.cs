@@ -27,7 +27,8 @@ public class HTTPServer
         try
         {
             _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
-            _listenerSocket.ReceiveBufferSize = 65536;
+            _listenerSocket.ReceiveBufferSize = 32768;
+            _listenerSocket.Listen(1024);
         }
         catch (Exception e)
         {
@@ -125,7 +126,7 @@ public class HTTPServer
         try
         {
             using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
-            byte[] buffer = new byte[65536];
+            byte[] buffer = new byte[32768];
             int bytesRead = await networkStream.ReadAsync(buffer);
 
             if (bytesRead == 0)
