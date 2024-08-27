@@ -6,27 +6,18 @@ namespace Ocelot.Meta.Test;
 public class ExampleController
 {
     [Get("/")]
-    public static HTMLResponse Index()
-    {
-        return new HTMLResponse("<h1>Hello</h1>");
-    }
+    public static HTMLResponse Index() => new("<h1>Hello</h1>");
 
     [Get("/json")]
-    public static JSONResponse JExample()
-    {
-        return new JSONResponse("{\"message\": \"This is a JSON response\"}");
-    }
+    public static JSONResponse JExample() => new("{\"message\": \"This is a JSON response\"}");
 
     [Get("/about")]
-    public static PlaintextResponse About()
-    {
-        return new PlaintextResponse("This is the about page.");
-    }
+    public static PlaintextResponse About() => new("This is the about page.");
 
     [Post("/submit")]
     public static PlaintextResponse Submit(HttpRequest request)
     {
-        string formData = request.Body; // Access form data from POST body
+        string formData = request.Body;
         return new PlaintextResponse($"Form data received: {formData}");
     }
 }
