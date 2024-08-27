@@ -56,14 +56,12 @@ public class HTTPServer
                     }
                     catch (InvalidCastException e)
                     {
-                        throw new InvalidResponseException(
-                            $"The response type was not valid: {e.Message}"
-                        );
+                        throw new InvalidResponseException($"The response type was not valid: {e}");
                     }
                     catch (Exception e)
                     {
                         throw new ResponseGenerationException(
-                            $"Issue generating HTTP response: {e.Message}"
+                            $"Issue generating HTTP response: {e}"
                         );
                     }
                 };
@@ -78,14 +76,12 @@ public class HTTPServer
                     }
                     catch (InvalidCastException e)
                     {
-                        throw new InvalidResponseException(
-                            $"The response type was not valid: {e.Message}"
-                        );
+                        throw new InvalidResponseException($"The response type was not valid: {e}");
                     }
                     catch (Exception e)
                     {
                         throw new ResponseGenerationException(
-                            $"Issue generating HTTP response: {e.Message}"
+                            $"Issue generating HTTP response: {e}"
                         );
                     }
                 };
@@ -167,9 +163,9 @@ public class HTTPServer
                 await SendErrorResponse(networkStream, "404 Not Found");
             }
         }
-        catch (Exception ex)
+        catch (Exception e)
         {
-            Console.WriteLine($"Error processing request: {ex.Message}");
+            Console.WriteLine($"Error processing request: {e}");
         }
     }
 
