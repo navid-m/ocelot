@@ -6,7 +6,13 @@ namespace Ocelot.Test;
 public class ExampleController
 {
     [Get("/")]
-    public static JSONResponse Index()
+    public static HTMLResponse Index()
+    {
+        return new HTMLResponse("<h1>Hello</h1>");
+    }
+
+    [Get("/json")]
+    public static JSONResponse JExample()
     {
         return new JSONResponse("{\"message\": \"This is a JSON response\"}");
     }
