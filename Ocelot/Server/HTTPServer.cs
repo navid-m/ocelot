@@ -14,7 +14,7 @@ public class HTTPServer
 {
     private readonly Socket _listenerSocket =
         new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-    private readonly Dictionary<string, Func<byte[]>> _routes = [];
+    private readonly Dictionary<string, Func<HttpRequest, byte[]>> _routes = new();
     private StaticFileMiddleware? _staticFileMiddleware;
     private readonly string ipAddress;
     private readonly int port;
@@ -23,8 +23,14 @@ public class HTTPServer
     {
         this.ipAddress = ipAddress;
         this.port = port;
-
-        _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
+        try
+        {
+            _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
+        }
+        catch (Exception e)
+        {
+            throw new AddressInUseException($"The address is already in use: {e}");
+        }
     }
 
     public void RegisterRoutes<
@@ -35,14 +41,42 @@ public class HTTPServer
         var instance = new T();
         foreach (var method in typeof(T).GetMethods())
         {
-            var attribute = method.GetCustomAttribute<GetAttribute>();
-            if (attribute != null)
+            var getAttribute = method.GetCustomAttribute<GetAttribute>();
+            var postAttribute = method.GetCustomAttribute<PostAttribute>();
+
+            if (getAttribute != null)
             {
-                _routes[attribute.Route] = () =>
+                // Updated to use a delegate that takes an HttpRequest as input
+                _routes[getAttribute.Route] = (request) =>
                 {
                     try
                     {
                         return GenerateHttpResponse((Response)method.Invoke(instance, null)!);
+                    }
+                    catch (InvalidCastException e)
+                    {
+                        throw new InvalidResponseException(
+                            $"The response type was not valid: {e.Message}"
+                        );
+                    }
+                    catch (Exception e)
+                    {
+                        throw new ResponseGenerationException(
+                            $"Issue generating HTTP response: {e.Message}"
+                        );
+                    }
+                };
+            }
+            else if (postAttribute != null)
+            {
+                // Updated to use a delegate that takes an HttpRequest as input
+                _routes[postAttribute.Route] = (request) =>
+                {
+                    try
+                    {
+                        return GenerateHttpResponse(
+                            (Response)method.Invoke(instance, new object[] { request })!
+                        );
                     }
                     catch (InvalidCastException e)
                     {
@@ -97,7 +131,7 @@ public class HTTPServer
         try
         {
             using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
-            var buffer = new byte[1024];
+            var buffer = new byte[2048];
             int bytesRead = await networkStream.ReadAsync(buffer);
 
             if (bytesRead == 0)
@@ -105,9 +139,8 @@ public class HTTPServer
                 return;
             }
 
-            string? route = ParseRequestRoute(buffer, bytesRead);
-
-            if (route == null)
+            HttpRequest request = ParseHttpRequest(buffer, bytesRead);
+            if (request.Route == null)
             {
                 await SendErrorResponse(networkStream, "400 Bad Request");
                 return;
@@ -116,17 +149,17 @@ public class HTTPServer
             // Check static files first
             if (
                 _staticFileMiddleware != null
-                && _staticFileMiddleware.TryServeFile(route, out var fileResponse)
+                && _staticFileMiddleware.TryServeFile(request.Route, out var fileResponse)
             )
             {
                 await networkStream.WriteAsync(fileResponse);
                 return;
             }
 
-            // Fallback to registered routes
-            if (_routes.TryGetValue(route, out var handler))
+            // Use the route with an HttpRequest parameter
+            if (_routes.TryGetValue(request.Route, out var handler))
             {
-                var responseBytes = handler();
+                var responseBytes = handler(request);
                 await networkStream.WriteAsync(responseBytes);
             }
             else
@@ -138,6 +171,43 @@ public class HTTPServer
         {
             Console.WriteLine($"Error processing request: {ex.Message}");
         }
+    }
+
+    private static HttpRequest ParseHttpRequest(byte[] buffer, int bytesRead)
+    {
+        string requestText = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+        string[] lines = requestText.Split("\r\n");
+        string[] requestLine = lines[0].Split(' ');
+
+        if (requestLine.Length < 3)
+        {
+            return new HttpRequest(null, null, [], string.Empty);
+        }
+
+        string method = requestLine[0];
+        string route = requestLine[1];
+
+        // Parse headers
+        Dictionary<string, string> headers = [];
+        int i = 1;
+        while (!string.IsNullOrWhiteSpace(lines[i]))
+        {
+            string[] headerParts = lines[i].Split(':', 2);
+            if (headerParts.Length == 2)
+            {
+                headers[headerParts[0].Trim()] = headerParts[1].Trim();
+            }
+            i++;
+        }
+
+        // Parse body (if it's a POST request)
+        string body = string.Empty;
+        if (method == "POST" && headers.TryGetValue("Content-Length", out string? contentLength))
+        {
+            int contentStartIndex = requestText.IndexOf("\r\n\r\n") + 4;
+            body = requestText.Substring(contentStartIndex, int.Parse(contentLength));
+        }
+        return new HttpRequest(route, method, headers, body);
     }
 
     private unsafe string? ParseRequestRoute(byte[] buffer, int bytesRead)

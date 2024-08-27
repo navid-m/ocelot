@@ -22,4 +22,11 @@ public class ExampleController
     {
         return new PlaintextResponse("This is the about page.");
     }
+
+    [Post("/submit")]
+    public static PlaintextResponse Submit(HttpRequest request)
+    {
+        string formData = request.Body; // Access form data from POST body
+        return new PlaintextResponse($"Form data received: {formData}");
+    }
 }
