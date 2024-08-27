@@ -5,8 +5,9 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        var app = new HTTPServer("127.0.0.1", 5001);
-        app.RegisterRoutes<ExampleController>();
-        await app.StartAsync();
+        var server = new HTTPServer("127.0.0.1", 8080);
+        server.RegisterRoutes<ExampleController>();
+        server.UseStaticFiles("Meta/Test/Static");
+        await server.StartAsync();
     }
 }

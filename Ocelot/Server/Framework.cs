@@ -5,14 +5,26 @@ using System.Reflection;
 using System.Text;
 using Ocelot.Responses;
 using Ocelot.Server.Exceptions;
+using Ocelot.Server.Middleware;
 
 namespace Ocelot.Server;
 
-public class HTTPServer(string ipAddress, int port)
+public class HTTPServer
 {
     private readonly Socket _listenerSocket =
         new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
     private readonly Dictionary<string, Func<byte[]>> _routes = [];
+    private StaticFileMiddleware? _staticFileMiddleware;
+    private string ipAddress;
+    private int port;
+
+    public HTTPServer(string ipAddress, int port)
+    {
+        this.ipAddress = ipAddress;
+        this.port = port;
+
+        _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
+    }
 
     public void RegisterRoutes<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)] T
@@ -48,18 +60,13 @@ public class HTTPServer(string ipAddress, int port)
         }
     }
 
-    private static byte[] GenerateHttpResponse(Response response)
+    public void UseStaticFiles(string rootDirectory)
     {
-        var content = response.GetContent();
-        var headers = Encoding.UTF8.GetBytes(
-            $"HTTP/1.1 200 OK\r\nContent-Type: {response.ContentType}\r\nContent-Length: {content.Length}\r\nConnection: close\r\n\r\n"
-        );
-        return CombineHeadersAndResponse(headers, content);
+        _staticFileMiddleware = new StaticFileMiddleware(rootDirectory);
     }
 
     public async Task StartAsync()
     {
-        _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
         _listenerSocket.Listen(512);
 
         Console.WriteLine($"Server started on: http://{ipAddress}:{port}\n");
@@ -73,6 +80,15 @@ public class HTTPServer(string ipAddress, int port)
             );
             _ = Task.Run(() => ProcessClientAsync(clientSocket));
         }
+    }
+
+    private static byte[] GenerateHttpResponse(Response response)
+    {
+        var content = response.GetContent();
+        var headers = Encoding.UTF8.GetBytes(
+            $"HTTP/1.1 200 OK\r\nContent-Type: {response.ContentType}\r\nContent-Length: {content.Length}\r\nConnection: close\r\n\r\n"
+        );
+        return CombineHeadersAndResponse(headers, content);
     }
 
     private async Task ProcessClientAsync(Socket clientSocket)
@@ -96,6 +112,17 @@ public class HTTPServer(string ipAddress, int port)
                 return;
             }
 
+            // Check static files first
+            if (
+                _staticFileMiddleware != null
+                && _staticFileMiddleware.TryServeFile(route, out var fileResponse)
+            )
+            {
+                await networkStream.WriteAsync(fileResponse);
+                return;
+            }
+
+            // Fallback to registered routes
             if (_routes.TryGetValue(route, out var handler))
             {
                 var responseBytes = handler();
