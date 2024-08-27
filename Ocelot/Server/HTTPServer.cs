@@ -114,10 +114,10 @@ public class HTTPServer
 
             // Use the route handler with pattern matching
             var matchedRoute = _routes.FirstOrDefault(r => r.IsMatch(request.Route));
+
             if (matchedRoute != null)
             {
-                var responseBytes = matchedRoute.Invoke(request);
-                await networkStream.WriteAsync(responseBytes);
+                await networkStream.WriteAsync(matchedRoute.Invoke(request));
             }
             else
             {
