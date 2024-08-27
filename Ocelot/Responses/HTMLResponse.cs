@@ -1,5 +1,3 @@
-using System.Text;
-
 namespace Ocelot.Responses;
 
 public class HTMLResponse(string htmlContent) : Response
@@ -8,5 +6,5 @@ public class HTMLResponse(string htmlContent) : Response
 
     public override string ContentType => "text/html";
 
-    public override byte[] GetContent() => Encoding.UTF8.GetBytes(_htmlContent);
+    public override byte[] GetContent() => System.Text.Encoding.UTF8.GetBytes(_htmlContent);
 }
