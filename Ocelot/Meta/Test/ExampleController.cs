@@ -1,9 +1,10 @@
 using Ocelot.Responses;
+using Ocelot.Routes;
 using Ocelot.Server;
 
 namespace Ocelot.Meta.Test;
 
-public class ExampleController
+public class HomeController : IController
 {
     [Get("/")]
     public static HTMLResponse Index() => new("<h1>Hello</h1>");
