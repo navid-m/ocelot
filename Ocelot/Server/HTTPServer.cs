@@ -27,7 +27,7 @@ public class HTTPServer
         this.port = port;
         try
         {
-            _listenerSocket.ReceiveBufferSize = 32768;
+            _listenerSocket.ReceiveBufferSize = 49152;
             _listenerSocket.SetSocketOption(
                 SocketOptionLevel.Socket,
                 SocketOptionName.KeepAlive,
@@ -69,7 +69,7 @@ public class HTTPServer
 
     public async Task StartAsync()
     {
-        _listenerSocket.Listen(1024);
+        _listenerSocket.Listen(2048);
 
         Console.WriteLine($"Server started on: http://{ipAddress}:{port}\n");
 
@@ -90,7 +90,7 @@ public class HTTPServer
         try
         {
             using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
-            byte[] buffer = new byte[32768];
+            byte[] buffer = new byte[49152];
             int bytesRead = await networkStream.ReadAsync(buffer);
 
             if (bytesRead == 0)
@@ -145,11 +145,10 @@ public class HTTPServer
             return new HttpRequest(null, null, [], string.Empty);
         }
 
-        string method = requestLine[0];
-        string route = requestLine[1];
-
         Dictionary<string, string> headers = [];
+        string method = requestLine[0];
         int i = 1;
+
         while (!string.IsNullOrWhiteSpace(lines[i]))
         {
             string[] headerParts = lines[i].Split(':', 2);
@@ -159,6 +158,7 @@ public class HTTPServer
             }
             i++;
         }
+
         string body = string.Empty;
         if (method == "POST" && headers.TryGetValue("Content-Length", out string? contentLength))
         {
@@ -167,7 +167,8 @@ public class HTTPServer
                 int.Parse(contentLength)
             );
         }
-        return new HttpRequest(route, method, headers, body);
+
+        return new HttpRequest(requestLine[1], method, headers, body);
     }
 
     public static void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
