@@ -27,7 +27,7 @@ public class HTTPServer
         try
         {
             _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
-            _listenerSocket.ReceiveBufferSize = 8192;
+            _listenerSocket.ReceiveBufferSize = 65536;
         }
         catch (Exception e)
         {
@@ -40,11 +40,11 @@ public class HTTPServer
     >()
         where T : new()
     {
-        var instance = new T();
+        T instance = new();
         foreach (var method in typeof(T).GetMethods())
         {
-            var getAttribute = method.GetCustomAttribute<GetAttribute>();
-            var postAttribute = method.GetCustomAttribute<PostAttribute>();
+            GetAttribute? getAttribute = method.GetCustomAttribute<GetAttribute>();
+            PostAttribute? postAttribute = method.GetCustomAttribute<PostAttribute>();
 
             if (getAttribute != null)
             {
@@ -125,7 +125,7 @@ public class HTTPServer
         try
         {
             using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
-            byte[] buffer = new byte[8192];
+            byte[] buffer = new byte[65536];
             int bytesRead = await networkStream.ReadAsync(buffer);
 
             if (bytesRead == 0)
