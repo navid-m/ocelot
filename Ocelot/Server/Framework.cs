@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
+using Ocelot.Responses;
 
 namespace Ocelot.Server;
 
@@ -23,13 +24,23 @@ public class HTTPServer(string ipAddress, int port)
             var attribute = method.GetCustomAttribute<GetAttribute>();
             if (attribute != null)
             {
-                var response = Encoding.UTF8.GetBytes(method.Invoke(instance, null)!.ToString()!);
-                var headers = Encoding.UTF8.GetBytes(
-                    $"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {response.Length}\r\nConnection: close\r\n\r\n"
-                );
-                _routes[attribute.Route] = () => CombineHeadersAndResponse(headers, response);
+                _routes[attribute.Route] = () =>
+                {
+                    var response = (ResponseType)method.Invoke(instance, null)!;
+                    return GenerateHttpResponse(response);
+                };
             }
         }
+    }
+
+    private static byte[] GenerateHttpResponse(ResponseType responseType)
+    {
+        var content = responseType.GetContent();
+        var headers = Encoding.UTF8.GetBytes(
+            $"HTTP/1.1 200 OK\r\nContent-Type: {responseType.ContentType}\r\nContent-Length: {content.Length}\r\nConnection: close\r\n\r\n"
+        );
+
+        return CombineHeadersAndResponse(headers, content);
     }
 
     public async Task StartAsync()

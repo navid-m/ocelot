@@ -1,3 +1,4 @@
+using Ocelot.Responses;
 using Ocelot.Server;
 
 namespace Ocelot.Test;
@@ -5,14 +6,14 @@ namespace Ocelot.Test;
 public class ExampleController
 {
     [Get("/")]
-    public static string Index()
+    public static JSONResponse Index()
     {
-        return "Hello, World!";
+        return new JSONResponse("{\"message\": \"This is a JSON response\"}");
     }
 
     [Get("/about")]
-    public static string About()
+    public static PlaintextResponse About()
     {
-        return "This is the about page.";
+        return new PlaintextResponse("This is the about page.");
     }
 }
