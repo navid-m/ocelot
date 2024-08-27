@@ -14,7 +14,7 @@ public class HTTPServer
 {
     private readonly Socket _listenerSocket =
         new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-    private readonly Dictionary<string, Func<HttpRequest, byte[]>> _routes = new();
+    private readonly Dictionary<string, Func<HttpRequest, byte[]>> _routes = [];
     private StaticFileMiddleware? _staticFileMiddleware;
     private readonly string ipAddress;
     private readonly int port;
@@ -74,9 +74,7 @@ public class HTTPServer
                 {
                     try
                     {
-                        return GenerateHttpResponse(
-                            (Response)method.Invoke(instance, new object[] { request })!
-                        );
+                        return GenerateHttpResponse((Response)method.Invoke(instance, [request])!);
                     }
                     catch (InvalidCastException e)
                     {
@@ -200,7 +198,6 @@ public class HTTPServer
             i++;
         }
 
-        // Parse body (if it's a POST request)
         string body = string.Empty;
         if (method == "POST" && headers.TryGetValue("Content-Length", out string? contentLength))
         {
@@ -208,52 +205,6 @@ public class HTTPServer
             body = requestText.Substring(contentStartIndex, int.Parse(contentLength));
         }
         return new HttpRequest(route, method, headers, body);
-    }
-
-    private unsafe string? ParseRequestRoute(byte[] buffer, int bytesRead)
-    {
-        fixed (byte* pBuffer = buffer)
-        {
-            // Find the end of the request line
-            byte* pEnd = pBuffer + bytesRead;
-            byte* pLineEnd = pBuffer;
-            while (pLineEnd < pEnd && *pLineEnd != (byte)'\n')
-            {
-                pLineEnd++;
-            }
-
-            if (pLineEnd == pBuffer || pLineEnd == pEnd)
-            {
-                return null;
-            }
-
-            // Find the start of the route (first space after the method)
-            byte* pRouteStart = pBuffer;
-            while (pRouteStart < pLineEnd && *pRouteStart != (byte)' ')
-            {
-                pRouteStart++;
-            }
-            pRouteStart++;
-
-            // Find the end of the route (space after the route)
-            byte* pRouteEnd = pRouteStart;
-            while (pRouteEnd < pLineEnd && *pRouteEnd != (byte)' ')
-            {
-                pRouteEnd++;
-            }
-
-            if (pRouteStart >= pRouteEnd)
-            {
-                return null;
-            }
-
-            // Convert the route to a string
-            return Encoding.UTF8.GetString(
-                buffer,
-                (int)(pRouteStart - pBuffer),
-                (int)(pRouteEnd - pRouteStart)
-            );
-        }
     }
 
     private static async Task SendErrorResponse(NetworkStream stream, string status)
