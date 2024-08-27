@@ -29,8 +29,7 @@ public class HTTPServer(string ipAddress, int port)
                 {
                     try
                     {
-                        var response = (Response)method.Invoke(instance, null)!;
-                        return GenerateHttpResponse(response);
+                        return GenerateHttpResponse((Response)method.Invoke(instance, null)!);
                     }
                     catch (InvalidCastException e)
                     {
