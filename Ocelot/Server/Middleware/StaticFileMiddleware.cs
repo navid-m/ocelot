@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
+using Ocelot.Server.Internal;
 
 namespace Ocelot.Server.Middleware;
 
@@ -27,7 +28,7 @@ public class StaticFileMiddleware(string rootDirectory)
         var headers = Encoding.UTF8.GetBytes(
             $"HTTP/1.1 200 OK\r\nContent-Type: {contentType}\r\nContent-Length: {fileBytes.Length}\r\nConnection: close\r\n\r\n"
         );
-        response = CombineHeadersAndResponse(headers, fileBytes);
+        response = ContentWriter.CombineHeadersAndResponse(headers, fileBytes);
         return true;
     }
 
@@ -44,12 +45,4 @@ public class StaticFileMiddleware(string rootDirectory)
             ".json" => "application/json",
             _ => "application/octet-stream"
         };
-
-    private static byte[] CombineHeadersAndResponse(byte[] headers, byte[] response)
-    {
-        var result = new byte[headers.Length + response.Length];
-        Buffer.BlockCopy(headers, 0, result, 0, headers.Length);
-        Buffer.BlockCopy(response, 0, result, headers.Length, response.Length);
-        return result;
-    }
 }

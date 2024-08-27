@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using Ocelot.Responses;
 using Ocelot.Server.Exceptions;
+using Ocelot.Server.Internal;
 using Ocelot.Server.Middleware;
 
 namespace Ocelot.Server;
@@ -88,7 +89,7 @@ public class HTTPServer
         var headers = Encoding.UTF8.GetBytes(
             $"HTTP/1.1 200 OK\r\nContent-Type: {response.ContentType}\r\nContent-Length: {content.Length}\r\nConnection: close\r\n\r\n"
         );
-        return CombineHeadersAndResponse(headers, content);
+        return ContentWriter.CombineHeadersAndResponse(headers, content);
     }
 
     private async Task ProcessClientAsync(Socket clientSocket)
@@ -192,13 +193,5 @@ public class HTTPServer
                 $"HTTP/1.1 {status}\r\nContent-Type: text/plain\r\nContent-Length: {status.Length}\r\nConnection: close\r\n\r\n{status}"
             )
         );
-    }
-
-    private static byte[] CombineHeadersAndResponse(byte[] headers, byte[] response)
-    {
-        var result = new byte[headers.Length + response.Length];
-        Buffer.BlockCopy(headers, 0, result, 0, headers.Length);
-        Buffer.BlockCopy(response, 0, result, headers.Length, response.Length);
-        return result;
     }
 }
