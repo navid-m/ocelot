@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using Ocelot.Responses;
+using Ocelot.Server.Exceptions;
 
 namespace Ocelot.Server;
 
@@ -26,8 +27,23 @@ public class HTTPServer(string ipAddress, int port)
             {
                 _routes[attribute.Route] = () =>
                 {
-                    var response = (Response)method.Invoke(instance, null)!;
-                    return GenerateHttpResponse(response);
+                    try
+                    {
+                        var response = (Response)method.Invoke(instance, null)!;
+                        return GenerateHttpResponse(response);
+                    }
+                    catch (InvalidCastException e)
+                    {
+                        throw new InvalidResponseException(
+                            $"The response type was not valid: {e.Message}"
+                        );
+                    }
+                    catch (Exception e)
+                    {
+                        throw new ResponseGenerationException(
+                            $"Issue generating HTTP response: {e.Message}"
+                        );
+                    }
                 };
             }
         }
