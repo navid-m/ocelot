@@ -39,7 +39,6 @@ public class HTTPServer(string ipAddress, int port)
         var headers = Encoding.UTF8.GetBytes(
             $"HTTP/1.1 200 OK\r\nContent-Type: {responseType.ContentType}\r\nContent-Length: {content.Length}\r\nConnection: close\r\n\r\n"
         );
-
         return CombineHeadersAndResponse(headers, content);
     }
 
@@ -57,7 +56,6 @@ public class HTTPServer(string ipAddress, int port)
                 _listenerSocket.EndAccept,
                 null
             );
-
             _ = Task.Run(() => ProcessClientAsync(clientSocket));
         }
     }
