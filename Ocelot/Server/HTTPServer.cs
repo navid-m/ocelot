@@ -71,7 +71,6 @@ public class HTTPServer
     {
         _listenerSocket.Listen(2048);
         Console.WriteLine($"Server started on: http://{ipAddress}:{port}\n");
-
         while (true)
         {
             Socket clientSocket = await AcceptAsync(_listenerSocket).ConfigureAwait(false);
