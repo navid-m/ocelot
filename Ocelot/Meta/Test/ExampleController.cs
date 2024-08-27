@@ -20,4 +20,12 @@ public class ExampleController
         string formData = request.Body;
         return new PlaintextResponse($"Form data received: {formData}");
     }
+
+    [Get("/increment/{number}")]
+    public static PlaintextResponse Increment(string value) =>
+        new($"Incremented number: {int.Parse(value) + 1}");
+
+    [Get("/greet/{entity}/{name}")]
+    public static PlaintextResponse Greet(string entity, string name) =>
+        new($"Hello {name}, the {entity}!");
 }

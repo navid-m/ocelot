@@ -4,7 +4,6 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Ocelot.Responses;
 using Ocelot.Server.Exceptions;
 using Ocelot.Server.Internal;
 using Ocelot.Server.Middleware;
@@ -15,7 +14,7 @@ public class HTTPServer
 {
     private readonly Socket _listenerSocket =
         new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-    private readonly Dictionary<string, Func<HttpRequest, byte[]>> _routes = [];
+    private readonly List<RouteHandler> _routes = [];
     private StaticFileMiddleware? _staticFileMiddleware;
     private readonly string ipAddress;
     private readonly int port;
@@ -48,43 +47,11 @@ public class HTTPServer
 
             if (getAttribute != null)
             {
-                _routes[getAttribute.Route] = (request) =>
-                {
-                    try
-                    {
-                        return GenerateHttpResponse((Response)method.Invoke(instance, null)!);
-                    }
-                    catch (InvalidCastException e)
-                    {
-                        throw new InvalidResponseException($"The response type was not valid: {e}");
-                    }
-                    catch (Exception e)
-                    {
-                        throw new ResponseGenerationException(
-                            $"Issue generating HTTP response: {e}"
-                        );
-                    }
-                };
+                _routes.Add(new RouteHandler(getAttribute.Route, method, instance));
             }
             else if (postAttribute != null)
             {
-                _routes[postAttribute.Route] = (request) =>
-                {
-                    try
-                    {
-                        return GenerateHttpResponse((Response)method.Invoke(instance, [request])!);
-                    }
-                    catch (InvalidCastException e)
-                    {
-                        throw new InvalidResponseException($"The response type was not valid: {e}");
-                    }
-                    catch (Exception e)
-                    {
-                        throw new ResponseGenerationException(
-                            $"Issue generating HTTP response: {e}"
-                        );
-                    }
-                };
+                _routes.Add(new RouteHandler(postAttribute.Route, method, instance, true));
             }
         }
     }
@@ -107,16 +74,6 @@ public class HTTPServer
             );
             _ = Task.Run(() => ProcessClientAsync(clientSocket));
         }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static byte[] GenerateHttpResponse(Response response)
-    {
-        var content = response.GetContent();
-        var headers = Encoding.UTF8.GetBytes(
-            $"HTTP/1.1 200 OK\r\nContent-Type: {response.ContentType}\r\nContent-Length: {content.Length}\r\nConnection: close\r\n\r\n"
-        );
-        return ContentWriter.CombineHeadersAndResponse(headers, content);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -150,10 +107,12 @@ public class HTTPServer
                 return;
             }
 
-            // Use the route with an HttpRequest parameter
-            if (_routes.TryGetValue(request.Route, out var handler))
+            // Use the route handler with pattern matching
+            var matchedRoute = _routes.FirstOrDefault(r => r.IsMatch(request.Route));
+            if (matchedRoute != null)
             {
-                await networkStream.WriteAsync(handler(request));
+                var responseBytes = matchedRoute.Invoke(request);
+                await networkStream.WriteAsync(responseBytes);
             }
             else
             {
