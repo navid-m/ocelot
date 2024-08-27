@@ -47,7 +47,6 @@ public class HTTPServer
 
             if (getAttribute != null)
             {
-                // Updated to use a delegate that takes an HttpRequest as input
                 _routes[getAttribute.Route] = (request) =>
                 {
                     try
@@ -70,7 +69,6 @@ public class HTTPServer
             }
             else if (postAttribute != null)
             {
-                // Updated to use a delegate that takes an HttpRequest as input
                 _routes[postAttribute.Route] = (request) =>
                 {
                     try
@@ -186,7 +184,6 @@ public class HTTPServer
         string method = requestLine[0];
         string route = requestLine[1];
 
-        // Parse headers
         Dictionary<string, string> headers = [];
         int i = 1;
         while (!string.IsNullOrWhiteSpace(lines[i]))
