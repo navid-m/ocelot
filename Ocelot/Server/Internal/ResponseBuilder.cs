@@ -1,7 +1,6 @@
 using Ocelot.Responses;
-using Ocelot.Server.Internal;
 
-namespace Ocelot.Server;
+namespace Ocelot.Server.Internal;
 
 internal static class ResponseBuilder
 {
