@@ -26,6 +26,7 @@ public class HTTPServer
         try
         {
             _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
+            _listenerSocket.ReceiveBufferSize = 4096;
         }
         catch (Exception e)
         {
