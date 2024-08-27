@@ -4,16 +4,13 @@ internal class TemplateContext
 {
     private readonly Dictionary<string, object> templateVariables;
 
-    public TemplateContext(object model)
+    public TemplateContext(ViewModel model)
     {
         templateVariables = [];
-        foreach (var prop in model.GetType().GetProperties())
+        foreach (var key in model.Keys)
         {
-            var val = prop.GetValue(model);
-            if (val != null)
-            {
-                templateVariables[prop.Name] = val;
-            }
+            // TODO: Add type processing here.
+            templateVariables[key] = model[key];
         }
     }
 

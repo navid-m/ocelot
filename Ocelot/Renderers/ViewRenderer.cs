@@ -16,7 +16,7 @@ public static class ViewRenderer
         TemplateExtension = "blade";
     }
 
-    public static HTMLResponse Render(object model, string viewPath)
+    public static HTMLResponse Render(ViewModel model, string viewPath)
     {
         string fullViewPath = Path.Join(TemplatesPath, viewPath + $".{TemplateExtension}");
         if (!File.Exists(fullViewPath))

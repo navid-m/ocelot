@@ -10,7 +10,10 @@ public class HomeController : IController
     [Get("/")]
     public static HTMLResponse Index()
     {
-        return ViewRenderer.Render(new { Firstname = "Bill", Lastname = "Gates" }, "index");
+        return ViewRenderer.Render(
+            new Renderers.Models.ViewModel { { "Firstname", "Bill" }, { "Lastname", "Gates" } },
+            "index"
+        );
     }
 
     [Get("/json")]
