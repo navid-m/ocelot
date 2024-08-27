@@ -135,17 +135,21 @@ public class HTTPServer(string ipAddress, int port)
             }
 
             // Convert the route to a string
-            int routeLength = (int)(pRouteEnd - pRouteStart);
-            return Encoding.UTF8.GetString(buffer, (int)(pRouteStart - pBuffer), routeLength);
+            return Encoding.UTF8.GetString(
+                buffer,
+                (int)(pRouteStart - pBuffer),
+                (int)(pRouteEnd - pRouteStart)
+            );
         }
     }
 
     private static async Task SendErrorResponse(NetworkStream stream, string status)
     {
-        var response = Encoding.UTF8.GetBytes(
-            $"HTTP/1.1 {status}\r\nContent-Type: text/plain\r\nContent-Length: {status.Length}\r\nConnection: close\r\n\r\n{status}"
+        await stream.WriteAsync(
+            Encoding.UTF8.GetBytes(
+                $"HTTP/1.1 {status}\r\nContent-Type: text/plain\r\nContent-Length: {status.Length}\r\nConnection: close\r\n\r\n{status}"
+            )
         );
-        await stream.WriteAsync(response);
     }
 
     private static byte[] CombineHeadersAndResponse(byte[] headers, byte[] response)
