@@ -13,7 +13,7 @@ public class StaticFileMiddleware(string rootDirectory)
         response = null;
 
         // Convert route to file path
-        var filePath = Path.Combine(
+        string filePath = Path.Combine(
             _rootDirectory,
             route.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)
         );
@@ -23,12 +23,16 @@ public class StaticFileMiddleware(string rootDirectory)
             return false;
         }
 
-        var fileBytes = File.ReadAllBytes(filePath);
-        var contentType = GetContentType(Path.GetExtension(filePath));
-        var headers = Encoding.UTF8.GetBytes(
-            $"HTTP/1.1 200 OK\r\nContent-Type: {contentType}\r\nContent-Length: {fileBytes.Length}\r\nConnection: close\r\n\r\n"
+        byte[] fileBytes = File.ReadAllBytes(filePath);
+        string contentType = GetContentType(Path.GetExtension(filePath));
+
+        response = ContentWriter.CombineHeadersAndResponse(
+            Encoding.UTF8.GetBytes(
+                $"HTTP/1.1 200 OK\r\nContent-Type: {contentType}\r\nContent-Length: {fileBytes.Length}\r\nConnection: close\r\n\r\n"
+            ),
+            fileBytes
         );
-        response = ContentWriter.CombineHeadersAndResponse(headers, fileBytes);
+
         return true;
     }
 
