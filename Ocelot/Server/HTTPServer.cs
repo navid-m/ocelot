@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Ocelot.Responses;
 using Ocelot.Server.Exceptions;
@@ -26,7 +27,7 @@ public class HTTPServer
         try
         {
             _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
-            _listenerSocket.ReceiveBufferSize = 4096;
+            _listenerSocket.ReceiveBufferSize = 8192;
         }
         catch (Exception e)
         {
@@ -114,6 +115,7 @@ public class HTTPServer
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static byte[] GenerateHttpResponse(Response response)
     {
         var content = response.GetContent();
@@ -123,12 +125,13 @@ public class HTTPServer
         return ContentWriter.CombineHeadersAndResponse(headers, content);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private async Task ProcessClientAsync(Socket clientSocket)
     {
         try
         {
             using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
-            var buffer = new byte[4096];
+            var buffer = new byte[8192];
             int bytesRead = await networkStream.ReadAsync(buffer);
 
             if (bytesRead == 0)
@@ -170,6 +173,7 @@ public class HTTPServer
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static HttpRequest ParseHttpRequest(byte[] buffer, int bytesRead)
     {
         string requestText = Encoding.UTF8.GetString(buffer, 0, bytesRead);
