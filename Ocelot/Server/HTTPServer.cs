@@ -70,19 +70,17 @@ public class HTTPServer
     public async Task StartAsync()
     {
         _listenerSocket.Listen(2048);
-
         Console.WriteLine($"Server started on: http://{ipAddress}:{port}\n");
 
         while (true)
         {
-            var clientSocket = await Task.Factory.FromAsync(
-                _listenerSocket.BeginAccept,
-                _listenerSocket.EndAccept,
-                null
-            );
-            _ = Task.Run(() => ProcessClientAsync(clientSocket));
+            Socket clientSocket = await AcceptAsync(_listenerSocket).ConfigureAwait(false);
+            _ = ProcessClientAsync(clientSocket);
         }
     }
+
+    private static ValueTask<Socket> AcceptAsync(Socket listenerSocket) =>
+        new(listenerSocket.Accept());
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private async Task ProcessClientAsync(Socket clientSocket)
