@@ -8,8 +8,9 @@ namespace Ocelot.Server;
 
 public class HTTPServer(string ipAddress, int port)
 {
-    private readonly TcpListener _listener = new(IPAddress.Parse(ipAddress), port);
-    private readonly Dictionary<string, Func<string>> _routes = [];
+    private readonly Socket _listenerSocket =
+        new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+    private readonly Dictionary<string, Func<byte[]>> _routes = [];
 
     public void RegisterRoutes<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)] T
@@ -22,111 +23,127 @@ public class HTTPServer(string ipAddress, int port)
             var attribute = method.GetCustomAttribute<GetAttribute>();
             if (attribute != null)
             {
-                _routes[attribute.Route] = () => method.Invoke(instance, null)!.ToString()!;
+                var response = Encoding.UTF8.GetBytes(method.Invoke(instance, null)!.ToString()!);
+                var headers = Encoding.UTF8.GetBytes(
+                    $"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: {response.Length}\r\nConnection: close\r\n\r\n"
+                );
+                _routes[attribute.Route] = () => CombineHeadersAndResponse(headers, response);
             }
         }
     }
 
     public async Task StartAsync()
     {
-        _listener.Start();
-        Console.WriteLine(
-            $@"
-Server started on: 
-http://{((IPEndPoint)_listener.LocalEndpoint).Address}:{((IPEndPoint)_listener.LocalEndpoint).Port}
-"
-        );
+        _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
+        _listenerSocket.Listen(512);
+
+        Console.WriteLine($"Server started on: http://{ipAddress}:{port}\n");
 
         while (true)
         {
-            var client = await _listener.AcceptTcpClientAsync();
-            _ = ProcessClientAsync(client);
+            var clientSocket = await Task.Factory.FromAsync(
+                _listenerSocket.BeginAccept,
+                _listenerSocket.EndAccept,
+                null
+            );
+
+            _ = Task.Run(() => ProcessClientAsync(clientSocket));
         }
     }
 
-    private async Task ProcessClientAsync(TcpClient client)
+    private async Task ProcessClientAsync(Socket clientSocket)
     {
         try
         {
-            using var networkStream = client.GetStream();
-            using var streamReader = new StreamReader(
-                networkStream,
-                Encoding.UTF8,
-                leaveOpen: true
-            );
-            var requestLine = await streamReader.ReadLineAsync();
-            if (requestLine == null)
+            using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
+            var buffer = new byte[1024];
+            int bytesRead = await networkStream.ReadAsync(buffer);
+
+            if (bytesRead == 0)
             {
-                await SendResponseAsync(
-                    networkStream,
-                    "400 Bad Request",
-                    "text/plain",
-                    "Bad Request"
-                );
                 return;
             }
 
-            string[]? requestParts = requestLine.Split(' ');
+            string? route = ParseRequestRoute(buffer, bytesRead);
 
-            if (requestParts.Length >= 2 && requestParts[0] == "GET")
+            if (route == null)
             {
-                var route = requestParts[1];
-                if (_routes.TryGetValue(route, out var handler))
-                {
-                    var responseText = handler();
-                    await SendResponseAsync(networkStream, "200 OK", "text/plain", responseText);
-                }
-                else
-                {
-                    await SendResponseAsync(
-                        networkStream,
-                        "404 Not Found",
-                        "text/plain",
-                        "Not Found"
-                    );
-                }
+                await SendErrorResponse(networkStream, "400 Bad Request");
+                return;
+            }
+
+            if (_routes.TryGetValue(route, out var handler))
+            {
+                var responseBytes = handler();
+                await networkStream.WriteAsync(responseBytes);
             }
             else
             {
-                await SendResponseAsync(
-                    networkStream,
-                    "400 Bad Request",
-                    "text/plain",
-                    "Bad Request"
-                );
+                await SendErrorResponse(networkStream, "404 Not Found");
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error processing request: {ex.Message}");
         }
-        finally
+    }
+
+    private unsafe string? ParseRequestRoute(byte[] buffer, int bytesRead)
+    {
+        fixed (byte* pBuffer = buffer)
         {
-            client.Close();
+            // Find the end of the request line
+            byte* pEnd = pBuffer + bytesRead;
+            byte* pLineEnd = pBuffer;
+            while (pLineEnd < pEnd && *pLineEnd != (byte)'\n')
+            {
+                pLineEnd++;
+            }
+
+            if (pLineEnd == pBuffer || pLineEnd == pEnd)
+            {
+                return null;
+            }
+
+            // Find the start of the route (first space after the method)
+            byte* pRouteStart = pBuffer;
+            while (pRouteStart < pLineEnd && *pRouteStart != (byte)' ')
+            {
+                pRouteStart++;
+            }
+            pRouteStart++;
+
+            // Find the end of the route (space after the route)
+            byte* pRouteEnd = pRouteStart;
+            while (pRouteEnd < pLineEnd && *pRouteEnd != (byte)' ')
+            {
+                pRouteEnd++;
+            }
+
+            if (pRouteStart >= pRouteEnd)
+            {
+                return null;
+            }
+
+            // Convert the route to a string
+            int routeLength = (int)(pRouteEnd - pRouteStart);
+            return Encoding.UTF8.GetString(buffer, (int)(pRouteStart - pBuffer), routeLength);
         }
     }
 
-    private static async Task SendResponseAsync(
-        NetworkStream stream,
-        string status,
-        string contentType,
-        string content
-    )
+    private static async Task SendErrorResponse(NetworkStream stream, string status)
     {
-        string headers =
-            $"HTTP/1.1 {status}\r\n"
-            + $"Content-Type: {contentType}\r\n"
-            + $"Content-Length: {content.Length}\r\n"
-            + "Connection: close\r\n\r\n";
+        var response = Encoding.UTF8.GetBytes(
+            $"HTTP/1.1 {status}\r\nContent-Type: text/plain\r\nContent-Length: {status.Length}\r\nConnection: close\r\n\r\n{status}"
+        );
+        await stream.WriteAsync(response);
+    }
 
-        byte[]? headersBytes = Encoding.UTF8.GetBytes(headers);
-        byte[]? contentBytes = Encoding.UTF8.GetBytes(content);
-
-        using var memoryStream = new MemoryStream(headersBytes.Length + contentBytes.Length);
-        await memoryStream.WriteAsync(headersBytes);
-        await memoryStream.WriteAsync(contentBytes);
-
-        memoryStream.Seek(0, SeekOrigin.Begin);
-        await memoryStream.CopyToAsync(stream);
+    private static byte[] CombineHeadersAndResponse(byte[] headers, byte[] response)
+    {
+        var result = new byte[headers.Length + response.Length];
+        Buffer.BlockCopy(headers, 0, result, 0, headers.Length);
+        Buffer.BlockCopy(response, 0, result, headers.Length, response.Length);
+        return result;
     }
 }
