@@ -18,16 +18,16 @@ public sealed class App
     private RouteHandler[]? _routes;
     private StaticFileMiddleware? _staticFileMiddleware;
     private WebSocketHandler[]? _wsHandlers;
-    private readonly string address;
-    private readonly int usedPort;
+    private readonly string _address;
+    private readonly int _usedPort;
     private readonly byte[] _buffer = new byte[8192];
 
     private readonly Dictionary<string, byte[]> _cache = [];
 
     public App(string ipAddress, int port)
     {
-        address = ipAddress;
-        usedPort = port;
+        _address = ipAddress;
+        _usedPort = port;
         _listenerSocket = new Socket(
             AddressFamily.InterNetwork,
             SocketType.Stream,
@@ -92,7 +92,7 @@ public sealed class App
 
     public async ValueTask StartAsync()
     {
-        Console.WriteLine($"Go to http://{address}:{usedPort}.");
+        Console.WriteLine($"Go to http://{_address}:{_usedPort}.");
         _listenerSocket.Listen(2048);
         await AcceptConnectionsAsync();
     }
@@ -160,7 +160,7 @@ public sealed class App
                 if (matchedWsRoute != null)
                 {
                     var listener = new HttpListener();
-                    listener.Prefixes.Add($"http://{address}:{usedPort}/");
+                    listener.Prefixes.Add($"http://{_address}:{_usedPort}/");
                     listener.Start();
 
                     HttpListenerContext context = await listener.GetContextAsync();
