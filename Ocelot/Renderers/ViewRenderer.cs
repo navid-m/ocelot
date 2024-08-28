@@ -5,7 +5,7 @@ using Ocelot.Responses;
 
 namespace Ocelot.Renderers;
 
-public static class ViewRenderer
+internal static class ViewRenderer
 {
     private static string TemplatesPath;
     private static string TemplateExtension;

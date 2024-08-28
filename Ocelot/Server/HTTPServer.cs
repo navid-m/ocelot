@@ -17,11 +17,9 @@ public class HTTPServer
     private readonly Socket _listenerSocket;
     private RouteHandler[]? _routes;
     private StaticFileMiddleware? _staticFileMiddleware;
-    private SocketAsyncEventArgs? _acceptEventArg;
-    private readonly TaskCompletionSource _serverRunning = new();
     private readonly string address;
     private readonly int usedPort;
-    private readonly byte[] _buffer = new byte[49152];
+    private readonly byte[] _buffer = new byte[8192];
 
     public HTTPServer(string ipAddress, int port)
     {
@@ -33,7 +31,7 @@ public class HTTPServer
             ProtocolType.Tcp
         )
         {
-            ReceiveBufferSize = 49152,
+            ReceiveBufferSize = 8192,
             NoDelay = true
         };
         _listenerSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
@@ -56,7 +54,6 @@ public class HTTPServer
         var methods = typeof(T).GetMethods();
         _routes = new RouteHandler[methods.Length];
         int index = 0;
-
         foreach (var method in methods)
         {
             var getAttribute = method.GetCustomAttribute<GetAttribute>();
@@ -84,29 +81,20 @@ public class HTTPServer
     {
         Console.WriteLine($"Go to http://{address}:{usedPort}.");
         _listenerSocket.Listen(2048);
-        _acceptEventArg = new SocketAsyncEventArgs();
-        _acceptEventArg.Completed += AcceptEventArg_Completed;
-        AcceptNext();
-        await _serverRunning.Task;
+        await AcceptConnectionsAsync();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void AcceptEventArg_Completed(object? sender, SocketAsyncEventArgs e)
+    private async Task AcceptConnectionsAsync()
     {
-        if (e.SocketError == SocketError.Success)
+        while (true)
         {
-            _ = ProcessClientAsync(e.AcceptSocket!);
-        }
-        e.AcceptSocket = null;
-        AcceptNext();
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void AcceptNext()
-    {
-        if (!_listenerSocket.AcceptAsync(_acceptEventArg!))
-        {
-            AcceptEventArg_Completed(this, _acceptEventArg!);
+            await ProcessClientAsync(
+                await Task.Factory.FromAsync(
+                    _listenerSocket.BeginAccept,
+                    _listenerSocket.EndAccept,
+                    null
+                )
+            );
         }
     }
 
@@ -116,7 +104,6 @@ public class HTTPServer
         try
         {
             using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
-
             int bytesRead = await networkStream.ReadAsync(_buffer);
             if (bytesRead == 0)
                 return;
