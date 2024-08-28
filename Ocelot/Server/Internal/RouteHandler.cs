@@ -56,22 +56,19 @@ internal partial class RouteHandler
         {
             throw new InvalidRouteException("Route did not match.");
         }
-
-        var parameterValues = new List<object>();
-
+        var parameterValues = new object[_parameterNames.Count + (_expectsRequest ? 1 : 0)];
         for (int i = 0; i < _parameterNames.Count; i++)
         {
-            parameterValues.Add(match.Groups[i + 1].Value);
+            parameterValues[_expectsRequest ? i + 1 : i] = match.Groups[i + 1].Value;
         }
-
         if (_expectsRequest)
         {
-            parameterValues.Insert(0, request);
+            parameterValues[0] = request;
         }
         try
         {
             return ResponseBuilder.GenerateHttpResponse(
-                (Response)_method.Invoke(_instance, [.. parameterValues])!
+                (Response)_method.Invoke(_instance, parameterValues)!
             );
         }
         catch (Exception e)

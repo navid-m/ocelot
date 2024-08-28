@@ -1,7 +1,10 @@
+using System.Runtime.CompilerServices;
+
 namespace Ocelot.Server.Internal;
 
 internal static class ContentWriter
 {
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static byte[] CombineHeadersAndResponse(byte[] headers, byte[] response)
     {
         byte[] result = new byte[headers.Length + response.Length];

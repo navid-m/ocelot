@@ -14,26 +14,31 @@ namespace Ocelot.Server;
 
 public class HTTPServer
 {
-    private readonly Socket _listenerSocket =
-        new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-    private readonly List<RouteHandler> _routes = [];
+    private readonly Socket _listenerSocket;
+    private RouteHandler[]? _routes;
     private StaticFileMiddleware? _staticFileMiddleware;
-    private readonly string ipAddress;
-    private readonly int port;
+    private SocketAsyncEventArgs? _acceptEventArg;
+    private readonly TaskCompletionSource _serverRunning = new();
+    private readonly string address;
+    private readonly int usedPort;
+    private readonly byte[] _buffer = new byte[49152];
 
     public HTTPServer(string ipAddress, int port)
     {
-        this.ipAddress = ipAddress;
-        this.port = port;
+        address = ipAddress;
+        usedPort = port;
+        _listenerSocket = new Socket(
+            AddressFamily.InterNetwork,
+            SocketType.Stream,
+            ProtocolType.Tcp
+        )
+        {
+            ReceiveBufferSize = 49152,
+            NoDelay = true
+        };
+        _listenerSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
         try
         {
-            _listenerSocket.ReceiveBufferSize = 49152;
-            _listenerSocket.SetSocketOption(
-                SocketOptionLevel.Socket,
-                SocketOptionName.KeepAlive,
-                true
-            );
-            _listenerSocket.NoDelay = true;
             _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
         }
         catch (Exception e)
@@ -48,38 +53,62 @@ public class HTTPServer
         where T : new()
     {
         T instance = new();
-        foreach (var method in typeof(T).GetMethods())
-        {
-            GetAttribute? getAttribute = method.GetCustomAttribute<GetAttribute>();
-            PostAttribute? postAttribute = method.GetCustomAttribute<PostAttribute>();
+        var methods = typeof(T).GetMethods();
+        _routes = new RouteHandler[methods.Length];
+        int index = 0;
 
+        foreach (var method in methods)
+        {
+            var getAttribute = method.GetCustomAttribute<GetAttribute>();
+            var postAttribute = method.GetCustomAttribute<PostAttribute>();
             if (getAttribute != null)
             {
-                _routes.Add(new RouteHandler(getAttribute.Route, method, instance));
+                _routes[index++] = new RouteHandler(getAttribute.Route, method, instance);
             }
             else if (postAttribute != null)
             {
-                _routes.Add(new RouteHandler(postAttribute.Route, method, instance, true));
+                _routes[index++] = new RouteHandler(postAttribute.Route, method, instance, true);
             }
+        }
+        if (index < _routes.Length)
+        {
+            Array.Resize(ref _routes, index);
         }
     }
 
     public void UseStaticFiles(string rootDirectory) =>
         _staticFileMiddleware = new StaticFileMiddleware(rootDirectory);
 
-    public async Task StartAsync()
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public async ValueTask StartAsync()
     {
+        Console.WriteLine($"Go to http://{address}:{usedPort}.");
         _listenerSocket.Listen(2048);
-        Console.WriteLine($"Server started on: http://{ipAddress}:{port}\n");
-        while (true)
-        {
-            Socket clientSocket = await AcceptAsync(_listenerSocket).ConfigureAwait(false);
-            _ = ProcessClientAsync(clientSocket);
-        }
+        _acceptEventArg = new SocketAsyncEventArgs();
+        _acceptEventArg.Completed += AcceptEventArg_Completed;
+        AcceptNext();
+        await _serverRunning.Task;
     }
 
-    private static ValueTask<Socket> AcceptAsync(Socket listenerSocket) =>
-        new(listenerSocket.Accept());
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void AcceptEventArg_Completed(object? sender, SocketAsyncEventArgs e)
+    {
+        if (e.SocketError == SocketError.Success)
+        {
+            _ = ProcessClientAsync(e.AcceptSocket!);
+        }
+        e.AcceptSocket = null;
+        AcceptNext();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void AcceptNext()
+    {
+        if (!_listenerSocket.AcceptAsync(_acceptEventArg!))
+        {
+            AcceptEventArg_Completed(this, _acceptEventArg!);
+        }
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private async Task ProcessClientAsync(Socket clientSocket)
@@ -87,22 +116,17 @@ public class HTTPServer
         try
         {
             using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
-            byte[] buffer = new byte[49152];
-            int bytesRead = await networkStream.ReadAsync(buffer);
 
+            int bytesRead = await networkStream.ReadAsync(_buffer);
             if (bytesRead == 0)
-            {
                 return;
-            }
 
-            HttpRequest request = ParseHttpRequest(buffer, bytesRead);
+            var request = ParseHttpRequest(_buffer, bytesRead);
             if (request.Route == null)
             {
                 await SendErrorResponse(networkStream, "400 Bad Request");
                 return;
             }
-
-            // Check static files first
             if (
                 _staticFileMiddleware != null
                 && _staticFileMiddleware.TryServeFile(request.Route, out var fileResponse)
@@ -111,10 +135,7 @@ public class HTTPServer
                 await networkStream.WriteAsync(fileResponse);
                 return;
             }
-
-            // Use the route handler with pattern matching
-            var matchedRoute = _routes.FirstOrDefault(r => r.IsMatch(request.Route));
-
+            var matchedRoute = Array.Find(_routes!, r => r?.IsMatch(request.Route) ?? false);
             if (matchedRoute != null)
             {
                 await networkStream.WriteAsync(matchedRoute.Invoke(request));
@@ -142,13 +163,13 @@ public class HTTPServer
             return new HttpRequest(null, null, [], string.Empty);
         }
 
-        Dictionary<string, string> headers = [];
+        var headers = new Dictionary<string, string>();
         string method = requestLine[0];
         int i = 1;
 
         while (!string.IsNullOrWhiteSpace(lines[i]))
         {
-            string[] headerParts = lines[i].Split(':', 2);
+            var headerParts = lines[i].Split(':', 2);
             if (headerParts.Length == 2)
             {
                 headers[headerParts[0].Trim()] = headerParts[1].Trim();
@@ -168,9 +189,10 @@ public class HTTPServer
         return new HttpRequest(requestLine[1], method, headers, body);
     }
 
-    public void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
+    public static void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
 
-    private static async Task SendErrorResponse(NetworkStream stream, string status)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static async ValueTask SendErrorResponse(NetworkStream stream, string status)
     {
         await stream.WriteAsync(
             Encoding.UTF8.GetBytes(

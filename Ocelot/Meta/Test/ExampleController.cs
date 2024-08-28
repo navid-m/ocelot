@@ -1,4 +1,3 @@
-using Ocelot.Renderers;
 using Ocelot.Responses;
 using Ocelot.Server;
 using Ocelot.Structures;
@@ -8,12 +7,13 @@ namespace Ocelot.Meta.Test;
 public class HomeController : IController
 {
     [Get("/")]
-    public static HTMLResponse Index()
+    public static PlaintextResponse Index()
     {
-        return ViewRenderer.Render(
-            new Renderers.Models.ViewModel { { "Firstname", "Bill" }, { "Lastname", "Gates" } },
-            "index"
-        );
+        // return ViewRenderer.Render(
+        //     new Renderers.Models.ViewModel { { "Firstname", "Bill" }, { "Lastname", "Gates" } },
+        //     "index"
+        // );
+        return new("Hello, World!");
     }
 
     [Get("/json")]

@@ -1,9 +1,11 @@
+using System.Runtime.CompilerServices;
 using Ocelot.Responses;
 
 namespace Ocelot.Server.Internal;
 
 internal static class ResponseBuilder
 {
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static byte[] GenerateHttpResponse(Response response)
     {
         byte[] content = response.GetContent();
