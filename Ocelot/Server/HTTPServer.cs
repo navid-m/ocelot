@@ -12,7 +12,7 @@ using Ocelot.Server.Middleware;
 
 namespace Ocelot.Server;
 
-public class HTTPServer
+public class App
 {
     private readonly Socket _listenerSocket;
     private RouteHandler[]? _routes;
@@ -21,7 +21,7 @@ public class HTTPServer
     private readonly int usedPort;
     private readonly byte[] _buffer = new byte[8192];
 
-    public HTTPServer(string ipAddress, int port)
+    public App(string ipAddress, int port)
     {
         address = ipAddress;
         usedPort = port;
@@ -175,7 +175,7 @@ public class HTTPServer
         return new HttpRequest(requestLine[1], method, headers, body);
     }
 
-    public static void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
+    public void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static async ValueTask SendErrorResponse(NetworkStream stream, string status)
