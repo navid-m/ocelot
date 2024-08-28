@@ -92,7 +92,7 @@ public sealed class App
 
     public async ValueTask StartAsync()
     {
-        Console.WriteLine($"Go to http://{_address}:{_usedPort}.");
+        Logger.LogInfo($"Server is at http://{_address}:{_usedPort}.", specifyNoLocation: true);
         _listenerSocket.Listen(2048);
         await AcceptConnectionsAsync();
     }
