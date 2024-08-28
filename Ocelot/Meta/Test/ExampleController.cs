@@ -5,7 +5,7 @@ using Ocelot.Structures;
 
 namespace Ocelot.Meta.Test;
 
-public class HomeController : IController
+public class HomeController : Controller
 {
     [Get("/")]
     public static View Index()

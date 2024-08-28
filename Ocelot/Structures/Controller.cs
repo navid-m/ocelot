@@ -4,7 +4,7 @@ using Ocelot.Responses;
 
 namespace Ocelot.Structures;
 
-public class IController
+public class Controller
 {
     public static View Render(ViewModel model, string viewPath)
     {
