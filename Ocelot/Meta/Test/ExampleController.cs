@@ -28,7 +28,7 @@ public class HomeController : Controller
     }
 
     [Get("/json")]
-    public static Json JExample() => new("{\"message\": \"This is a JSON response\"}");
+    public static Json SerialExample() => new("{\"message\": \"This is a JSON response\"}");
 
     [Get("/about")]
     public static Text About() => new("This is the about page.");
