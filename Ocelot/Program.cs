@@ -9,8 +9,7 @@ class Program
 
         app.RegisterRoutes<HomeController>();
         app.UseStaticFiles("Meta/Test/Static");
-
-        HTTPServer.UseTemplatePath("Meta/Test/Views");
+        app.UseTemplatePath("Meta/Test/Views");
 
         await app.StartAsync();
     }

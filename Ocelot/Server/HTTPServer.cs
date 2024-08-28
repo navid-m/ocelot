@@ -168,7 +168,7 @@ public class HTTPServer
         return new HttpRequest(requestLine[1], method, headers, body);
     }
 
-    public static void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
+    public void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
 
     private static async Task SendErrorResponse(NetworkStream stream, string status)
     {
