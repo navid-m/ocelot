@@ -149,13 +149,13 @@ public class HTTPServer
             return new HttpRequest(null, null, [], string.Empty);
         }
 
-        var headers = new Dictionary<string, string>();
+        Dictionary<string, string> headers = [];
         string method = requestLine[0];
         int i = 1;
 
         while (!string.IsNullOrWhiteSpace(lines[i]))
         {
-            var headerParts = lines[i].Split(':', 2);
+            string[] headerParts = lines[i].Split(':', 2);
             if (headerParts.Length == 2)
             {
                 headers[headerParts[0].Trim()] = headerParts[1].Trim();
