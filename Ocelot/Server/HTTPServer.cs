@@ -76,7 +76,6 @@ public class HTTPServer
     public void UseStaticFiles(string rootDirectory) =>
         _staticFileMiddleware = new StaticFileMiddleware(rootDirectory);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public async ValueTask StartAsync()
     {
         Console.WriteLine($"Go to http://{address}:{usedPort}.");
@@ -84,7 +83,7 @@ public class HTTPServer
         await AcceptConnectionsAsync();
     }
 
-    private async Task AcceptConnectionsAsync()
+    private async ValueTask AcceptConnectionsAsync()
     {
         while (true)
         {
@@ -99,11 +98,12 @@ public class HTTPServer
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private async Task ProcessClientAsync(Socket clientSocket)
+    private async ValueTask ProcessClientAsync(Socket clientSocket)
     {
         try
         {
             using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
+
             int bytesRead = await networkStream.ReadAsync(_buffer);
             if (bytesRead == 0)
                 return;

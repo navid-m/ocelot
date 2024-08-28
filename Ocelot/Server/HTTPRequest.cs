@@ -1,6 +1,6 @@
 namespace Ocelot.Server;
 
-public class HttpRequest(
+public readonly struct HttpRequest(
     string? route,
     string? method,
     Dictionary<string, string> headers,
