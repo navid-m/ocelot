@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
@@ -20,9 +21,9 @@ public sealed class App
     private WebSocketHandler[]? _wsHandlers;
     private readonly string _address;
     private readonly int _usedPort;
-    private readonly byte[] _buffer = new byte[8192];
-
-    private readonly Dictionary<string, byte[]> _cache = [];
+    private static readonly int _minBufSize = 32768;
+    private readonly byte[] _buffer = new byte[_minBufSize];
+    private readonly ConcurrentDictionary<string, byte[]> _cache = [];
 
     public App(string ipAddress, int port)
     {
@@ -34,7 +35,7 @@ public sealed class App
             ProtocolType.Tcp
         )
         {
-            ReceiveBufferSize = 8192,
+            ReceiveBufferSize = _minBufSize,
             NoDelay = true
         };
         _listenerSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
@@ -90,6 +91,7 @@ public sealed class App
     public void UseStaticFiles(string rootDirectory) =>
         _staticFileMiddleware = new StaticFileMiddleware(rootDirectory);
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public async ValueTask StartAsync()
     {
         Logger.LogInfo($"Server is at http://{_address}:{_usedPort}.", specifyNoLocation: true);
@@ -97,6 +99,7 @@ public sealed class App
         await AcceptConnectionsAsync();
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private async ValueTask AcceptConnectionsAsync()
     {
         while (true)
@@ -179,7 +182,7 @@ public sealed class App
             if (matchedRoute != null)
             {
                 var responseBytes = matchedRoute.Invoke(request);
-                if (request.Method == "GET" && responseBytes.Length <= 8192)
+                if (request.Method == "GET" && responseBytes.Length <= _minBufSize)
                 {
                     _cache[request.Route] = responseBytes;
                 }
@@ -236,6 +239,7 @@ public sealed class App
 
     public void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static async ValueTask SendErrorResponse(NetworkStream stream, string status)
     {
         await stream.WriteAsync(
