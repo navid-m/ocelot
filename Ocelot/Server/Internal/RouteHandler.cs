@@ -27,6 +27,7 @@ internal sealed partial class RouteHandler
         (_routeRegex, _parameterNames) = BuildRouteRegex(routePattern);
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private static (Regex, string[]) BuildRouteRegex(string routePattern)
     {
         var parameterNames = new List<string>();

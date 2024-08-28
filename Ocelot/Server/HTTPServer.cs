@@ -111,7 +111,7 @@ public sealed class App
         }
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private async ValueTask ProcessClientAsync(Socket clientSocket)
     {
         try
@@ -196,7 +196,7 @@ public sealed class App
         }
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private static HttpRequest ParseHttpRequest(byte[] buffer, int bytesRead)
     {
         string requestText = Encoding.UTF8.GetString(buffer, 0, bytesRead);

@@ -4,18 +4,11 @@ using System.Text.RegularExpressions;
 
 namespace Ocelot.Server.Internal
 {
-    internal sealed class WebSocketHandler
+    internal sealed class WebSocketHandler(string routePattern, MethodInfo method, object instance)
     {
-        private readonly MethodInfo _method;
-        private readonly object _instance;
-        private readonly Regex _routeRegex;
-
-        public WebSocketHandler(string routePattern, MethodInfo method, object instance)
-        {
-            _method = method;
-            _instance = instance;
-            _routeRegex = new Regex($"^{routePattern}$", RegexOptions.Compiled);
-        }
+        private readonly MethodInfo _method = method;
+        private readonly object _instance = instance;
+        private readonly Regex _routeRegex = new($"^{routePattern}$", RegexOptions.Compiled);
 
         public bool IsMatch(string route) => _routeRegex.IsMatch(route);
 
