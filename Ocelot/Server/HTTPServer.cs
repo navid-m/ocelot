@@ -22,6 +22,8 @@ public sealed class App
     private readonly int usedPort;
     private readonly byte[] _buffer = new byte[8192];
 
+    private readonly Dictionary<string, byte[]> _cache = [];
+
     public App(string ipAddress, int port)
     {
         address = ipAddress;
@@ -125,6 +127,16 @@ public sealed class App
                 await SendErrorResponse(networkStream, "400 Bad Request");
                 return;
             }
+
+            if (
+                request.Method == "GET"
+                && _cache.TryGetValue(request.Route, out var cachedResponse)
+            )
+            {
+                await networkStream.WriteAsync(cachedResponse);
+                return;
+            }
+
             if (
                 _staticFileMiddleware != null
                 && _staticFileMiddleware.TryServeFile(request.Route, out var fileResponse)
@@ -163,12 +175,17 @@ public sealed class App
                     return;
                 }
             }
-
-            // Existing logic for HTTP routes
             var matchedRoute = Array.Find(_routes!, r => r?.IsMatch(request.Route) ?? false);
             if (matchedRoute != null)
             {
-                await networkStream.WriteAsync(matchedRoute.Invoke(request));
+                var responseBytes = matchedRoute.Invoke(request);
+                if (request.Method == "GET" && responseBytes.Length <= 8192)
+                {
+                    // Cache it.
+                    Console.WriteLine("Stored in cache.");
+                    _cache[request.Route] = responseBytes;
+                }
+                await networkStream.WriteAsync(responseBytes);
             }
             else
             {
