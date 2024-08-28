@@ -2,7 +2,7 @@ using Ocelot.Renderers.Models;
 
 namespace Ocelot.Renderers.Internal;
 
-internal partial class BladeParser
+internal sealed partial class BladeParser
 {
     public static bool TryParse(string template, out Template templateObj, out string? error)
     {

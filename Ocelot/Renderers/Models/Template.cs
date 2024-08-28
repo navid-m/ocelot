@@ -2,7 +2,7 @@ using Ocelot.Renderers.Internal;
 
 namespace Ocelot.Renderers.Models;
 
-internal class Template(string template)
+internal sealed class Template(string template)
 {
     private readonly string _template = template;
 

@@ -6,7 +6,7 @@ using Ocelot.Server.Exceptions;
 
 namespace Ocelot.Server.Internal;
 
-internal partial class RouteHandler
+internal sealed partial class RouteHandler
 {
     private readonly MethodInfo _method;
     private readonly object _instance;

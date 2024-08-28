@@ -1,6 +1,6 @@
 namespace Ocelot.Renderers.Models;
 
-internal class TemplateContext
+internal sealed class TemplateContext
 {
     private readonly Dictionary<string, object> templateVariables;
 

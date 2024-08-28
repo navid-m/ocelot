@@ -1,6 +1,6 @@
 namespace Ocelot.Renderers.Models
 {
-    public class ViewModel : Dictionary<string, string>
+    public sealed class ViewModel : Dictionary<string, string>
     {
         public override string ToString() =>
             string.Join(";", this.Select(kv => $"{Escape(kv.Key)}={Escape(kv.Value)}"));

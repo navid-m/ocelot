@@ -12,7 +12,7 @@ using Ocelot.Server.Middleware;
 
 namespace Ocelot.Server;
 
-public class App
+public sealed class App
 {
     private readonly Socket _listenerSocket;
     private RouteHandler[]? _routes;
