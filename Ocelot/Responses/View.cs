@@ -1,6 +1,6 @@
 namespace Ocelot.Responses;
 
-public sealed class HTMLResponse(string htmlContent) : Response
+public sealed class View(string htmlContent) : Response
 {
     private readonly string _htmlContent = htmlContent;
 

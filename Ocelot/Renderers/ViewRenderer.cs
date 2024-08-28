@@ -16,7 +16,7 @@ internal static class ViewRenderer
         TemplateExtension = "blade";
     }
 
-    public static HTMLResponse Render(ViewModel model, string viewPath)
+    public static View Render(ViewModel model, string viewPath)
     {
         string fullViewPath = Path.Join(TemplatesPath, viewPath + $".{TemplateExtension}");
         if (!File.Exists(fullViewPath))
@@ -25,10 +25,10 @@ internal static class ViewRenderer
         }
         if (BladeParser.TryParse(File.ReadAllText(fullViewPath), out var template, out var error))
         {
-            return new HTMLResponse(template.Render(new TemplateContext(model)));
+            return new View(template.Render(new TemplateContext(model)));
         }
         Logger.LogIssue(errorMessage: $"Issue parsing template: {error}", fatal: true);
-        return new HTMLResponse(string.Empty);
+        return new View(string.Empty);
     }
 
     public static void SetTemplatesPath(string path) => TemplatesPath = path;

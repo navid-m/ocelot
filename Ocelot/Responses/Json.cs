@@ -1,6 +1,6 @@
 namespace Ocelot.Responses;
 
-public sealed class JSONResponse(string jsonContent) : Response
+public sealed class Json(string jsonContent) : Response
 {
     private readonly string jsonContent = jsonContent;
 

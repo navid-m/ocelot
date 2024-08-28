@@ -1,3 +1,4 @@
+using Ocelot.Renderers.Models;
 using Ocelot.Responses;
 using Ocelot.Server;
 using Ocelot.Structures;
@@ -7,33 +8,35 @@ namespace Ocelot.Meta.Test;
 public class HomeController : IController
 {
     [Get("/")]
-    public static PlaintextResponse Index()
+    public static View Index()
     {
-        // return ViewRenderer.Render(
-        //     new Renderers.Models.ViewModel { { "Firstname", "Bill" }, { "Lastname", "Gates" } },
-        //     "index"
-        // );
-        return new("Hello, World!");
+        return Render(
+            new ViewModel
+            {
+                { "Firstname", "Bill" },
+                { "Lastname", "Gates" },
+                { "Something", "Something else" }
+            },
+            "index"
+        );
+    }
+
+    [Post("/submit")]
+    public static Text Submit(HttpRequest request)
+    {
+        return new($"Form data received: {request.Body}");
     }
 
     [Get("/json")]
-    public static JSONResponse JExample() => new("{\"message\": \"This is a JSON response\"}");
+    public static Json JExample() => new("{\"message\": \"This is a JSON response\"}");
 
     [Get("/about")]
-    public static PlaintextResponse About() => new("This is the about page.");
-
-    [Post("/submit")]
-    public static PlaintextResponse Submit(HttpRequest request)
-    {
-        string formData = request.Body;
-        return new PlaintextResponse($"Form data received: {formData}");
-    }
+    public static Text About() => new("This is the about page.");
 
     [Get("/increment/{number}")]
-    public static PlaintextResponse Increment(string value) =>
+    public static Text Increment(string value) =>
         new($"Incremented number: {int.Parse(value) + 1}");
 
     [Get("/greet/{entity}/{name}")]
-    public static PlaintextResponse Greet(string entity, string name) =>
-        new($"Hello {name}, the {entity}!");
+    public static Text Greet(string entity, string name) => new($"Hello {name}, the {entity}!");
 }

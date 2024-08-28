@@ -1,3 +1,13 @@
+using Ocelot.Renderers;
+using Ocelot.Renderers.Models;
+using Ocelot.Responses;
+
 namespace Ocelot.Structures;
 
-public interface IController { }
+public class IController
+{
+    public static View Render(ViewModel model, string viewPath)
+    {
+        return ViewRenderer.Render(model, viewPath);
+    }
+}
