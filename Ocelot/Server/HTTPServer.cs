@@ -103,7 +103,6 @@ public class HTTPServer
         try
         {
             using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
-
             int bytesRead = await networkStream.ReadAsync(_buffer);
             if (bytesRead == 0)
                 return;

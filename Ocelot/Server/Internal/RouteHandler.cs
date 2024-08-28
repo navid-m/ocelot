@@ -12,7 +12,7 @@ internal partial class RouteHandler
     private readonly object _instance;
     private readonly bool _expectsRequest;
     private readonly Regex _routeRegex;
-    private readonly List<string> _parameterNames;
+    private readonly string[] _parameterNames;
 
     public RouteHandler(
         string routePattern,
@@ -27,7 +27,7 @@ internal partial class RouteHandler
         (_routeRegex, _parameterNames) = BuildRouteRegex(routePattern);
     }
 
-    private static (Regex, List<string>) BuildRouteRegex(string routePattern)
+    private static (Regex, string[]) BuildRouteRegex(string routePattern)
     {
         var parameterNames = new List<string>();
         var pattern =
@@ -42,7 +42,7 @@ internal partial class RouteHandler
                     }
                 )
             + "$";
-        return (new Regex(pattern), parameterNames);
+        return (new Regex(pattern), [.. parameterNames]);
     }
 
     public bool IsMatch(string route) => _routeRegex.IsMatch(route);
@@ -56,8 +56,8 @@ internal partial class RouteHandler
         {
             throw new InvalidRouteException("Route did not match.");
         }
-        var parameterValues = new object[_parameterNames.Count + (_expectsRequest ? 1 : 0)];
-        for (int i = 0; i < _parameterNames.Count; i++)
+        var parameterValues = new object[_parameterNames.Length + (_expectsRequest ? 1 : 0)];
+        for (int i = 0; i < _parameterNames.Length; i++)
         {
             parameterValues[_expectsRequest ? i + 1 : i] = match.Groups[i + 1].Value;
         }
