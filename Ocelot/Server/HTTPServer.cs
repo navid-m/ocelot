@@ -181,8 +181,6 @@ public sealed class App
                 var responseBytes = matchedRoute.Invoke(request);
                 if (request.Method == "GET" && responseBytes.Length <= 8192)
                 {
-                    // Cache it.
-                    Console.WriteLine("Stored in cache.");
                     _cache[request.Route] = responseBytes;
                 }
                 await networkStream.WriteAsync(responseBytes);
