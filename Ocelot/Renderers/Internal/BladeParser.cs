@@ -13,11 +13,6 @@ internal partial class BladeParser
             error = "Template is empty.";
             return false;
         }
-        if (!Expressions.TemplateValueRegex().IsMatch(template))
-        {
-            error = "No placeholders found in the template.";
-            return false;
-        }
         templateObj = new Template(template);
         return true;
     }
