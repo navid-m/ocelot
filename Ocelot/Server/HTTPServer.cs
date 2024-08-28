@@ -1,10 +1,14 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using DotNetty.Buffers;
+using DotNetty.Codecs.Http;
+using DotNetty.Transport.Bootstrapping;
+using DotNetty.Transport.Channels;
+using DotNetty.Transport.Channels.Sockets;
 using Ocelot.Renderers;
 using Ocelot.Reports;
 using Ocelot.Server.Exceptions;
@@ -13,41 +17,17 @@ using Ocelot.Server.Middleware;
 
 namespace Ocelot.Server;
 
-public sealed class App
+public sealed class App(string ipAddress, int port)
 {
-    private readonly Socket _listenerSocket;
     private RouteHandler[]? _routes;
     private StaticFileMiddleware? _staticFileMiddleware;
     private WebSocketHandler[]? _wsHandlers;
-    private readonly string _address;
-    private readonly int _usedPort;
-    private static readonly int _minBufSize = 32768;
-    private readonly byte[] _buffer = new byte[_minBufSize];
+    private readonly string _address = ipAddress;
+    private readonly int _port = port;
     private readonly ConcurrentDictionary<string, byte[]> _cache = [];
-
-    public App(string ipAddress, int port)
-    {
-        _address = ipAddress;
-        _usedPort = port;
-        _listenerSocket = new Socket(
-            AddressFamily.InterNetwork,
-            SocketType.Stream,
-            ProtocolType.Tcp
-        )
-        {
-            ReceiveBufferSize = _minBufSize,
-            NoDelay = true
-        };
-        _listenerSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
-        try
-        {
-            _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
-        }
-        catch (Exception e)
-        {
-            throw new AddressInUseException($"The address is already in use: {e.Message}");
-        }
-    }
+    private MultithreadEventLoopGroup? _bossGroup;
+    private MultithreadEventLoopGroup? _workerGroup;
+    private IChannel? _boundChannel;
 
     public void RegisterRoutes<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)] T
@@ -58,7 +38,6 @@ public sealed class App
         var methods = typeof(T).GetMethods();
         _routes = new RouteHandler[methods.Length];
         var wsRoutes = new List<WebSocketHandler>();
-
         int index = 0;
         foreach (var method in methods)
         {
@@ -91,161 +70,158 @@ public sealed class App
     public void UseStaticFiles(string rootDirectory) =>
         _staticFileMiddleware = new StaticFileMiddleware(rootDirectory);
 
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public async ValueTask StartAsync()
     {
-        Logger.LogInfo($"Server is at http://{_address}:{_usedPort}.", specifyNoLocation: true);
-        _listenerSocket.Listen(2048);
-        await AcceptConnectionsAsync();
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private async ValueTask AcceptConnectionsAsync()
-    {
-        while (true)
+        _bossGroup = new MultithreadEventLoopGroup(1);
+        _workerGroup = new MultithreadEventLoopGroup();
+        try
         {
-            await ProcessClientAsync(
-                await Task.Factory.FromAsync(
-                    _listenerSocket.BeginAccept,
-                    _listenerSocket.EndAccept,
-                    null
+            var bootstrap = new ServerBootstrap();
+            bootstrap
+                .Group(_bossGroup, _workerGroup)
+                .Channel<TcpServerSocketChannel>()
+                .Option(ChannelOption.SoBacklog, 8192)
+                .ChildOption(ChannelOption.TcpNodelay, true)
+                .ChildHandler(
+                    new ActionChannelInitializer<ISocketChannel>(channel =>
+                    {
+                        channel.Pipeline.AddLast(new HttpServerCodec());
+                        channel.Pipeline.AddLast(new HttpObjectAggregator(65536));
+                        channel.Pipeline.AddLast(new AppServerHandler(this));
+                    })
+                );
+            _boundChannel = await bootstrap.BindAsync(IPAddress.Parse(_address), _port);
+            Logger.LogInfo($"Server is at http://{_address}:{_port}.", specifyNoLocation: true);
+            await _boundChannel.CloseCompletion;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogIssue($"An error occurred: {ex.Message}");
+            throw new AddressInUseException($"The address is already in use: {ex.Message}");
+        }
+        finally
+        {
+            await Task.WhenAll(
+                _bossGroup.ShutdownGracefullyAsync(
+                    TimeSpan.FromMilliseconds(100),
+                    TimeSpan.FromSeconds(1)
+                ),
+                _workerGroup.ShutdownGracefullyAsync(
+                    TimeSpan.FromMilliseconds(100),
+                    TimeSpan.FromSeconds(1)
                 )
             );
         }
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private async ValueTask ProcessClientAsync(Socket clientSocket)
-    {
-        try
-        {
-            using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
-            int bytesRead = await networkStream.ReadAsync(_buffer);
-            if (bytesRead == 0)
-                return;
-
-            var request = ParseHttpRequest(_buffer, bytesRead);
-            if (request.Route == null)
-            {
-                await SendErrorResponse(networkStream, "400 Bad Request");
-                return;
-            }
-
-            if (
-                request.Method == "GET"
-                && _cache.TryGetValue(request.Route, out var cachedResponse)
-            )
-            {
-                await networkStream.WriteAsync(cachedResponse);
-                return;
-            }
-
-            if (
-                _staticFileMiddleware != null
-                && _staticFileMiddleware.TryServeFile(request.Route, out var fileResponse)
-            )
-            {
-                await networkStream.WriteAsync(fileResponse);
-                return;
-            }
-            if (_wsHandlers != null)
-            {
-                WebSocketHandler? matchedWsRoute;
-                try
-                {
-                    matchedWsRoute = _wsHandlers.FirstOrDefault(h => h.IsMatch(request.Route));
-                }
-                catch (Exception e)
-                {
-                    Logger.LogIssue($"Error processing websocket route: {e.Message}");
-                    throw;
-                }
-                if (matchedWsRoute != null)
-                {
-                    var listener = new HttpListener();
-                    listener.Prefixes.Add($"http://{_address}:{_usedPort}/");
-                    listener.Start();
-
-                    HttpListenerContext context = await listener.GetContextAsync();
-
-                    if (context.Request.IsWebSocketRequest)
-                    {
-                        var wsContext = await context.AcceptWebSocketAsync(subProtocol: null);
-                        await matchedWsRoute.HandleWebSocketAsync(wsContext.WebSocket);
-                    }
-
-                    listener.Stop();
-                    return;
-                }
-            }
-            var matchedRoute = Array.Find(_routes!, r => r?.IsMatch(request.Route) ?? false);
-            if (matchedRoute != null)
-            {
-                var responseBytes = matchedRoute.Invoke(request);
-                if (request.Method == "GET" && responseBytes.Length <= _minBufSize)
-                {
-                    _cache[request.Route] = responseBytes;
-                }
-                await networkStream.WriteAsync(responseBytes);
-            }
-            else
-            {
-                await SendErrorResponse(networkStream, "404 Not Found");
-            }
-        }
-        catch (Exception e)
-        {
-            Logger.LogIssue($"Error processing request: {e.Message}\nTrace: {e.StackTrace}");
-        }
-    }
+    public static void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private static HttpRequest ParseHttpRequest(byte[] buffer, int bytesRead)
+    internal async Task HandleRequestAsync(IChannelHandlerContext ctx, IFullHttpRequest request)
     {
-        string requestText = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-        string[] lines = requestText.Split("\r\n");
-        string[] requestLine = lines[0].Split(' ');
+        var uri = request.Uri;
+        var method = request.Method.ToString();
 
-        if (requestLine.Length < 3)
+        if (
+            method == DotNetty.Codecs.Http.HttpMethod.Get.ToString()
+            && _cache.TryGetValue(uri, out var cachedResponse)
+        )
         {
-            return new HttpRequest(null, null, [], string.Empty);
+            await SendResponseAsync(ctx, Unpooled.WrappedBuffer(cachedResponse));
+            return;
         }
 
-        Dictionary<string, string> headers = [];
-        string method = requestLine[0];
-        int i = 1;
-
-        while (!string.IsNullOrWhiteSpace(lines[i]))
+        if (
+            _staticFileMiddleware != null
+            && _staticFileMiddleware.TryServeFile(uri, out var fileResponse)
+        )
         {
-            string[] headerParts = lines[i].Split(':', 2);
-            if (headerParts.Length == 2)
+            await SendResponseAsync(ctx, Unpooled.WrappedBuffer(fileResponse));
+            return;
+        }
+
+        if (_wsHandlers != null)
+        {
+            var matchedWsRoute = _wsHandlers.FirstOrDefault(h => h.IsMatch(uri));
+            if (matchedWsRoute != null)
             {
-                headers[headerParts[0].Trim()] = headerParts[1].Trim();
+                // WebSocket handling logic here
+                // This part requires additional implementation to integrate with DotNetty's WebSocket support
+                return;
             }
-            i++;
         }
 
-        string body = string.Empty;
-        if (method == "POST" && headers.TryGetValue("Content-Length", out string? contentLength))
+        var matchedRoute = Array.Find(_routes!, r => r?.IsMatch(uri) ?? false);
+        if (matchedRoute != null)
         {
-            body = requestText.Substring(
-                requestText.IndexOf("\r\n\r\n") + 4,
-                int.Parse(contentLength)
+            var httpRequest = new HttpRequest(
+                uri,
+                method,
+                GetHeaders(request.Headers),
+                GetBody(request)
             );
+            var responseBytes = matchedRoute.Invoke(httpRequest);
+
+            if (
+                method == DotNetty.Codecs.Http.HttpMethod.Get.ToString()
+                && responseBytes.Length <= 32768
+            )
+            {
+                _cache[uri] = responseBytes;
+            }
+
+            await SendResponseAsync(ctx, Unpooled.WrappedBuffer(responseBytes));
         }
-
-        return new HttpRequest(requestLine[1], method, headers, body);
+        else
+        {
+            await SendErrorResponseAsync(ctx, HttpResponseStatus.NotFound);
+        }
     }
-
-    public void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static async ValueTask SendErrorResponse(NetworkStream stream, string status)
+    private static Dictionary<string, string> GetHeaders(HttpHeaders headers)
     {
-        await stream.WriteAsync(
-            Encoding.UTF8.GetBytes(
-                $"HTTP/1.1 {status}\r\nContent-Type: text/plain\r\nContent-Length: {status.Length}\r\nConnection: close\r\n\r\n{status}"
-            )
+        var result = new Dictionary<string, string>();
+        foreach (var header in headers)
+        {
+            result[header.Key.ToString()] = header.Value.ToString();
+        }
+        return result;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static string GetBody(IFullHttpRequest request)
+    {
+        var content = request.Content;
+        if (content.IsReadable())
+        {
+            var buffer = new byte[content.ReadableBytes];
+            content.ReadBytes(buffer);
+            return Encoding.UTF8.GetString(buffer);
+        }
+        return string.Empty;
+    }
+
+    private static async Task SendResponseAsync(IChannelHandlerContext ctx, IByteBuffer content)
+    {
+        var response = new DefaultFullHttpResponse(
+            DotNetty.Codecs.Http.HttpVersion.Http11,
+            HttpResponseStatus.OK,
+            content
         );
+        response.Headers.Set(HttpHeaderNames.ContentType, "text/plain");
+        response.Headers.Set(HttpHeaderNames.ContentLength, content.ReadableBytes);
+        await ctx.WriteAndFlushAsync(response);
+    }
+
+    private static async Task SendErrorResponseAsync(
+        IChannelHandlerContext ctx,
+        HttpResponseStatus status
+    )
+    {
+        var response = new DefaultFullHttpResponse(DotNetty.Codecs.Http.HttpVersion.Http11, status);
+        response.Headers.Set(HttpHeaderNames.ContentType, "text/plain");
+        response.Headers.Set(HttpHeaderNames.ContentLength, 0);
+        await ctx.WriteAndFlushAsync(response);
     }
 }
