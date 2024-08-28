@@ -17,6 +17,7 @@ public sealed class App
     private readonly Socket _listenerSocket;
     private RouteHandler[]? _routes;
     private StaticFileMiddleware? _staticFileMiddleware;
+    private WebSocketHandler[]? _wsHandlers;
     private readonly string address;
     private readonly int usedPort;
     private readonly byte[] _buffer = new byte[8192];
@@ -53,11 +54,15 @@ public sealed class App
         T instance = new();
         var methods = typeof(T).GetMethods();
         _routes = new RouteHandler[methods.Length];
+        var wsRoutes = new List<WebSocketHandler>();
+
         int index = 0;
         foreach (var method in methods)
         {
             var getAttribute = method.GetCustomAttribute<GetAttribute>();
             var postAttribute = method.GetCustomAttribute<PostAttribute>();
+            var wsAttribute = method.GetCustomAttribute<WsAttribute>();
+
             if (getAttribute != null)
             {
                 _routes[index++] = new RouteHandler(getAttribute.Route, method, instance);
@@ -66,11 +71,18 @@ public sealed class App
             {
                 _routes[index++] = new RouteHandler(postAttribute.Route, method, instance, true);
             }
+            else if (wsAttribute != null)
+            {
+                wsRoutes.Add(new WebSocketHandler(wsAttribute.Route, method, instance));
+            }
         }
+
         if (index < _routes.Length)
         {
             Array.Resize(ref _routes, index);
         }
+
+        _wsHandlers = [.. wsRoutes];
     }
 
     public void UseStaticFiles(string rootDirectory) =>
@@ -121,6 +133,37 @@ public sealed class App
                 await networkStream.WriteAsync(fileResponse);
                 return;
             }
+            if (_wsHandlers != null)
+            {
+                WebSocketHandler? matchedWsRoute;
+                try
+                {
+                    matchedWsRoute = _wsHandlers.FirstOrDefault(h => h.IsMatch(request.Route));
+                }
+                catch (Exception e)
+                {
+                    Logger.LogIssue($"Error processing websocket route: {e.Message}");
+                    throw;
+                }
+                if (matchedWsRoute != null)
+                {
+                    var listener = new HttpListener();
+                    listener.Prefixes.Add($"http://{address}:{usedPort}/");
+                    listener.Start();
+
+                    var context = await listener.GetContextAsync();
+                    if (context.Request.IsWebSocketRequest)
+                    {
+                        var wsContext = await context.AcceptWebSocketAsync(subProtocol: null);
+                        await matchedWsRoute.HandleWebSocketAsync(wsContext.WebSocket);
+                    }
+
+                    listener.Stop();
+                    return;
+                }
+            }
+
+            // Existing logic for HTTP routes
             var matchedRoute = Array.Find(_routes!, r => r?.IsMatch(request.Route) ?? false);
             if (matchedRoute != null)
             {

@@ -19,16 +19,15 @@ public class StaticFileMiddleware(string rootDirectory)
         );
 
         if (!File.Exists(filePath))
-        {
             return false;
-        }
 
         byte[] fileBytes = File.ReadAllBytes(filePath);
-        string contentType = GetContentType(Path.GetExtension(filePath));
 
         response = ContentWriter.CombineHeadersAndResponse(
             Encoding.UTF8.GetBytes(
-                $"HTTP/1.1 200 OK\r\nContent-Type: {contentType}\r\nContent-Length: {fileBytes.Length}\r\nConnection: close\r\n\r\n"
+                $"HTTP/1.1 200 OK\r\n"
+                    + $"Content-Type: {GetContentType(Path.GetExtension(filePath))}\r\n"
+                    + $"Content-Length: {fileBytes.Length}\r\nConnection: close\r\n\r\n"
             ),
             fileBytes
         );
