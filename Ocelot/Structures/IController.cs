@@ -10,4 +10,9 @@ public class IController
     {
         return ViewRenderer.Render(model, viewPath);
     }
+
+    public static View Render(string viewPath)
+    {
+        return ViewRenderer.Render([], viewPath);
+    }
 }
