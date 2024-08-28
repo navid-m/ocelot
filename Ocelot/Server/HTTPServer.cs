@@ -151,7 +151,8 @@ public sealed class App
                     listener.Prefixes.Add($"http://{address}:{usedPort}/");
                     listener.Start();
 
-                    var context = await listener.GetContextAsync();
+                    HttpListenerContext context = await listener.GetContextAsync();
+
                     if (context.Request.IsWebSocketRequest)
                     {
                         var wsContext = await context.AcceptWebSocketAsync(subProtocol: null);
