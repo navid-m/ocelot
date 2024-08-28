@@ -47,7 +47,7 @@ internal sealed partial class RouteHandler
 
     public bool IsMatch(string route) => _routeRegex.IsMatch(route);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public byte[] Invoke(HttpRequest request)
     {
         var match = _routeRegex.Match(request.Route!);
