@@ -238,7 +238,6 @@ public sealed class App
 
     public void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static async ValueTask SendErrorResponse(NetworkStream stream, string status)
     {
         await stream.WriteAsync(
