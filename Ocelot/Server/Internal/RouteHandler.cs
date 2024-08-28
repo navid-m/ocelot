@@ -50,7 +50,7 @@ internal sealed partial class RouteHandler
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public byte[] Invoke(HttpRequest request)
     {
-        var match = _routeRegex.Match(request.Route!);
+        Match match = _routeRegex.Match(request.Route!);
 
         if (!match.Success)
         {
