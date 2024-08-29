@@ -113,6 +113,7 @@ public sealed class App
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private async Task ProcessRequestsAsync()
     {
         await foreach (var context in _requestQueue.Reader.ReadAllAsync())
