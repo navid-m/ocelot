@@ -2,7 +2,6 @@
 
 Dependency-free, minimal MVC web framework designed for .NET, optimized for Ahead-Of-Time (AOT) compilation. 
 
-____
 
 ## Why
 
