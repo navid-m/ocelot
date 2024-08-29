@@ -8,11 +8,25 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Title>Ocelot</Title>
     <Authors>Navid M</Authors>
-    <Version>1.1.0</Version>
+    <Version>1.0.1</Version>
     <Description>MVC web framework for AOT (ahead-of-time) compiled projects</Description>
     <Copyright>Copyright Navid M (2024)</Copyright>
     <PackageProjectUrl>https://github.com/navid-m/ocelot/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/navid-m/ocelot/</RepositoryUrl>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>microframework;mvc;web;framework;webframework;aot;aheadoftime;aotcompilation;flask;fast;</PackageTags>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\Ocelot.Test\Static\icon.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
 </Project>
