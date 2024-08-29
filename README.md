@@ -12,8 +12,8 @@ ASP .NET Core does not support MVC with AOT.
 
 To run a web application:
 
-1. Initialize the `HttpServer` with your desired host and port.
-2. Register your controller routes using `RegisterRoutes`.
+1. Initialize the `HttpServer` with host and port.
+2. Register controller routes using `RegisterRoutes`.
 3. Optionally, configure static file serving and template paths.
 
 ```csharp
