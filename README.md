@@ -1,6 +1,6 @@
-# Ocelot.Web
+# Ocelot
 
-Dependency-free, minimal MVC web framework designed for .NET, optimized for Ahead-Of-Time (AOT) compilation. 
+WebOcelot is a dependency-free, minimal MVC web framework designed for .NET, optimized for Ahead-Of-Time (AOT) compilation. 
 
 ## Why
 
