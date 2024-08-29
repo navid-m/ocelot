@@ -127,14 +127,13 @@ public sealed class App
     {
         try
         {
-            var request = context.Request;
-            var response = context.Response;
+            HttpListenerRequest request = context.Request;
+            HttpListenerResponse response = context.Response;
 
             string body = string.Empty;
             if (request.HttpMethod == "POST")
             {
-                using var reader = new StreamReader(request.InputStream, Encoding.UTF8);
-                body = await reader.ReadToEndAsync();
+                body = await new StreamReader(request.InputStream, Encoding.UTF8).ReadToEndAsync();
             }
 
             string route = request.Url?.AbsolutePath ?? string.Empty;
@@ -161,7 +160,9 @@ public sealed class App
 
             if (_wsHandlers != null)
             {
-                var matchedWsRoute = _wsHandlers.FirstOrDefault(h => h.IsMatch(route));
+                WebSocketHandler? matchedWsRoute = _wsHandlers.FirstOrDefault(h =>
+                    h.IsMatch(route)
+                );
                 if (matchedWsRoute != null && context.Request.IsWebSocketRequest)
                 {
                     await matchedWsRoute.HandleWebSocketAsync(
@@ -171,7 +172,7 @@ public sealed class App
                 }
             }
 
-            var matchedRoute = Array.Find(_routes!, r => r?.IsMatch(route) ?? false);
+            RouteHandler? matchedRoute = Array.Find(_routes!, r => r?.IsMatch(route) ?? false);
 
             if (matchedRoute != null)
             {
