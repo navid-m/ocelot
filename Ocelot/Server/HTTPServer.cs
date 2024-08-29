@@ -4,6 +4,7 @@ using System.Net;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading.Channels;
 using Ocelot.Renderers;
 using Ocelot.Reports;
 using Ocelot.Server.Internal;
@@ -11,15 +12,35 @@ using Ocelot.Server.Middleware;
 
 namespace Ocelot.Server;
 
-public sealed class App(string ipAddress, int port)
+public sealed class App
 {
     private RouteHandler[]? _routes;
     private StaticFileMiddleware? _staticFileMiddleware;
     private WebSocketHandler[]? _wsHandlers;
-    private readonly string _address = ipAddress;
-    private readonly int _usedPort = port;
-    private static readonly int _minBufSize = 32768;
+    private readonly string _address;
+    private readonly int _port;
     private readonly ConcurrentDictionary<string, byte[]> _cache = new();
+    private readonly Channel<HttpListenerContext> _requestQueue;
+    private static readonly int _minBufSize = 32768;
+
+    public App(string ipAddress, int port)
+    {
+        _address = ipAddress;
+        _port = port;
+        _requestQueue = Channel.CreateBounded<HttpListenerContext>(
+            new BoundedChannelOptions(10000)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                SingleReader = false,
+                SingleWriter = true
+            }
+        );
+        ThreadPool.SetMinThreads(100, 100);
+        ThreadPool.SetMaxThreads(
+            Environment.ProcessorCount * 100,
+            Environment.ProcessorCount * 100
+        );
+    }
 
     public void RegisterRoutes<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)] T
@@ -63,38 +84,50 @@ public sealed class App(string ipAddress, int port)
     public void UseStaticFiles(string rootDirectory) =>
         _staticFileMiddleware = new StaticFileMiddleware(rootDirectory);
 
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public async ValueTask StartAsync()
     {
-        Logger.LogInfo($"Server is at http://{_address}:{_usedPort}.", specifyNoLocation: true);
+        Logger.LogInfo($"Server is running at http://{_address}:{_port}", specifyNoLocation: true);
 
         var listener = new HttpListener();
-        listener.Prefixes.Add($"http://{_address}:{_usedPort}/");
+        listener.Prefixes.Add($"http://{_address}:{_port}/");
         listener.Start();
+
+        var processingTasks = Enumerable
+            .Range(0, Environment.ProcessorCount)
+            .Select(_ => ProcessRequestsAsync())
+            .ToArray();
 
         try
         {
             while (true)
             {
                 var context = await listener.GetContextAsync();
-                await ProcessClientAsync(context);
+                await _requestQueue.Writer.WriteAsync(context);
             }
         }
         finally
         {
             listener.Stop();
+            _requestQueue.Writer.Complete();
+            await Task.WhenAll(processingTasks);
         }
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private async ValueTask ProcessClientAsync(HttpListenerContext context)
+    private async Task ProcessRequestsAsync()
+    {
+        await foreach (var context in _requestQueue.Reader.ReadAllAsync())
+        {
+            _ = ProcessClientAsync(context);
+        }
+    }
+
+    private async Task ProcessClientAsync(HttpListenerContext context)
     {
         try
         {
             var request = context.Request;
             var response = context.Response;
 
-            // Read request body if necessary
             string body = string.Empty;
             if (request.HttpMethod == "POST")
             {
@@ -102,10 +135,9 @@ public sealed class App(string ipAddress, int port)
                 body = await reader.ReadToEndAsync();
             }
 
-            // Parse the request URL and determine route
             string route = request.Url?.AbsolutePath ?? string.Empty;
 
-            if (route == string.Empty || request.HttpMethod == string.Empty)
+            if (string.IsNullOrEmpty(route) || string.IsNullOrEmpty(request.HttpMethod))
             {
                 await SendErrorResponse(response, "400 Bad Request");
                 return;
@@ -127,18 +159,12 @@ public sealed class App(string ipAddress, int port)
 
             if (_wsHandlers != null)
             {
-                WebSocketHandler? matchedWsRoute = _wsHandlers.FirstOrDefault(h =>
-                    h.IsMatch(route)
-                );
-                if (matchedWsRoute != null)
+                var matchedWsRoute = _wsHandlers.FirstOrDefault(h => h.IsMatch(route));
+                if (matchedWsRoute != null && context.Request.IsWebSocketRequest)
                 {
-                    if (context.Request.IsWebSocketRequest)
-                    {
-                        await matchedWsRoute.HandleWebSocketAsync(
-                            (await context.AcceptWebSocketAsync(subProtocol: null)).WebSocket
-                        );
-                        return;
-                    }
+                    var webSocketContext = await context.AcceptWebSocketAsync(subProtocol: null);
+                    await matchedWsRoute.HandleWebSocketAsync(webSocketContext.WebSocket);
+                    return;
                 }
             }
 
@@ -150,9 +176,10 @@ public sealed class App(string ipAddress, int port)
                     new HttpRequest(
                         route,
                         request.HttpMethod,
-                        request
-                            .Headers.AllKeys.Where(k => k != null)
-                            .ToDictionary(k => k!, k => request.Headers[k] ?? string.Empty),
+                        request.Headers.AllKeys.ToDictionary(
+                            k => k!,
+                            k => request.Headers[k] ?? string.Empty
+                        ),
                         body
                     ),
                     response
@@ -160,6 +187,14 @@ public sealed class App(string ipAddress, int port)
 
                 if (request.HttpMethod == "GET" && responseBytes.Length <= _minBufSize)
                 {
+                    if (_cache.Count >= 262144)
+                    {
+                        string? oldestKey = _cache.Keys.OrderBy(k => k).FirstOrDefault();
+                        if (oldestKey != null)
+                        {
+                            _cache.TryRemove(oldestKey, out _);
+                        }
+                    }
                     _cache[route] = responseBytes;
                 }
                 await WriteResponseAsync(response, responseBytes);
@@ -181,6 +216,8 @@ public sealed class App(string ipAddress, int port)
         byte[] responseBytes
     )
     {
+        response.ContentLength64 = responseBytes.Length;
+        response.ContentEncoding = Encoding.UTF8;
         using var outputStream = response.OutputStream;
         await outputStream.WriteAsync(responseBytes);
     }
