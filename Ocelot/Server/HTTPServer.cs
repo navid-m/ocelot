@@ -130,13 +130,13 @@ public sealed class App(string ipAddress, int port)
                 WebSocketHandler? matchedWsRoute = _wsHandlers.FirstOrDefault(h =>
                     h.IsMatch(route)
                 );
-
                 if (matchedWsRoute != null)
                 {
                     if (context.Request.IsWebSocketRequest)
                     {
-                        var wsContext = await context.AcceptWebSocketAsync(subProtocol: null);
-                        await matchedWsRoute.HandleWebSocketAsync(wsContext.WebSocket);
+                        await matchedWsRoute.HandleWebSocketAsync(
+                            (await context.AcceptWebSocketAsync(subProtocol: null)).WebSocket
+                        );
                         return;
                     }
                 }
