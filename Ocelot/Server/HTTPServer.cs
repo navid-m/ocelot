@@ -28,7 +28,7 @@ public sealed class App
         _address = ipAddress;
         _port = port;
         _requestQueue = Channel.CreateBounded<HttpListenerContext>(
-            new BoundedChannelOptions(10000)
+            new BoundedChannelOptions(20000)
             {
                 FullMode = BoundedChannelFullMode.Wait,
                 SingleReader = false,
