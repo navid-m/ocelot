@@ -1,4 +1,4 @@
-namespace Ocelot.Reports.Data;
+namespace Ocelot.Diagnostics.Data;
 
 internal enum Location
 {

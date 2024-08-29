@@ -2,7 +2,7 @@ using System.Net.WebSockets;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
-namespace Ocelot.Server.Internal;
+namespace Ocelot.Web.Internal;
 
 internal sealed class WebSocketHandler(string routePattern, MethodInfo method, object instance)
 {

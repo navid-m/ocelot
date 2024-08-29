@@ -1,4 +1,4 @@
-namespace Ocelot.Renderers.Models
+namespace Ocelot.Rendering.Models
 {
     public sealed class ViewModel : Dictionary<string, string>
     {

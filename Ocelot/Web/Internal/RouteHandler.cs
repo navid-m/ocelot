@@ -3,9 +3,9 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Ocelot.Responses;
-using Ocelot.Server.Exceptions;
+using Ocelot.Web.Exceptions;
 
-namespace Ocelot.Server.Internal;
+namespace Ocelot.Web.Internal;
 
 internal sealed partial class RouteHandler
 {

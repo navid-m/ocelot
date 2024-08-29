@@ -5,14 +5,15 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Channels;
-using Ocelot.Renderers;
-using Ocelot.Reports;
-using Ocelot.Server.Internal;
-using Ocelot.Server.Middleware;
+using Ocelot.Diagnostics;
+using Ocelot.Rendering;
+using Ocelot.Web.Exceptions;
+using Ocelot.Web.Internal;
+using Ocelot.Web.Middleware;
 
-namespace Ocelot.Server;
+namespace Ocelot.Web;
 
-public sealed class App
+public sealed class HttpServer
 {
     private RouteHandler[]? _routes;
     private StaticFileMiddleware? _staticFileMiddleware;
@@ -23,7 +24,7 @@ public sealed class App
     private readonly Channel<HttpListenerContext> _requestQueue;
     private static readonly int _minBufSize = 32768;
 
-    public App(string ipAddress, int port)
+    public HttpServer(string ipAddress, int port)
     {
         _address = ipAddress;
         _port = port;
@@ -51,8 +52,8 @@ public sealed class App
         var methods = typeof(T).GetMethods();
         _routes = new RouteHandler[methods.Length];
         var wsRoutes = new List<WebSocketHandler>();
-
         int index = 0;
+
         foreach (var method in methods)
         {
             var getAttribute = method.GetCustomAttribute<GetAttribute>();
@@ -86,11 +87,28 @@ public sealed class App
 
     public async ValueTask StartAsync()
     {
-        Logger.LogInfo($"Server is running at http://{_address}:{_port}", specifyNoLocation: true);
-
         var listener = new HttpListener();
         listener.Prefixes.Add($"http://{_address}:{_port}/");
-        listener.Start();
+
+        try
+        {
+            listener.Start();
+            Logger.LogInfo(
+                $"Server is running at http://{_address}:{_port}",
+                specifyNoLocation: true
+            );
+        }
+        catch (Exception ex)
+        {
+            if (ex is HttpListenerException)
+            {
+                Logger.LogIssue(
+                    $"The address '{_address}:/{_port}' is already in use.",
+                    fatal: true,
+                    exception: new AddressInUseException()
+                );
+            }
+        }
 
         var processingTasks = Enumerable
             .Range(0, Environment.ProcessorCount)

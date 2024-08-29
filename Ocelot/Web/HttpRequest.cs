@@ -1,4 +1,4 @@
-namespace Ocelot.Server;
+namespace Ocelot.Web;
 
 public readonly struct HttpRequest(
     string? route,

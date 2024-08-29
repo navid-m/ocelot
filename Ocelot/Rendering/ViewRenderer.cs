@@ -1,9 +1,9 @@
-using Ocelot.Renderers.Internal;
-using Ocelot.Renderers.Models;
-using Ocelot.Reports;
+using Ocelot.Diagnostics;
+using Ocelot.Rendering.Internal;
+using Ocelot.Rendering.Models;
 using Ocelot.Responses;
 
-namespace Ocelot.Renderers;
+namespace Ocelot.Rendering;
 
 internal static class ViewRenderer
 {

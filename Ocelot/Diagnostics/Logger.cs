@@ -1,6 +1,6 @@
-using Ocelot.Reports.Data;
+using Ocelot.Diagnostics.Data;
 
-namespace Ocelot.Reports;
+namespace Ocelot.Diagnostics;
 
 internal static class Logger
 {
@@ -10,7 +10,8 @@ internal static class Logger
         string errorMessage,
         Location location = Location.MAIN,
         bool fatal = false,
-        bool truncate = false
+        bool truncate = false,
+        Exception? exception = null
     )
     {
         Console.ForegroundColor = ConsoleColor.Red;
@@ -18,7 +19,7 @@ internal static class Logger
         Console.ResetColor();
         if (fatal)
         {
-            throw new Exception(errorMessage);
+            throw exception ?? new Exception(errorMessage);
         }
     }
 
@@ -61,8 +62,7 @@ internal static class Logger
             int maxMessageLength =
                 StatusContainerWidth - 18 - location.ToString().Length - type.Length;
             truncatedMessage = message[..maxMessageLength] + "...";
-            truncationNotice =
-                $"[Message truncated: {message.Length - maxMessageLength} characters omitted]\n";
+            truncationNotice = $"[{message.Length - maxMessageLength} characters omitted]\n";
         }
 
         string locationSpecifier = string.Empty;

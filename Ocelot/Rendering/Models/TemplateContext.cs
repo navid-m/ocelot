@@ -1,4 +1,4 @@
-namespace Ocelot.Renderers.Models;
+namespace Ocelot.Rendering.Models;
 
 internal sealed class TemplateContext
 {

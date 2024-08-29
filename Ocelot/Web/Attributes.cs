@@ -1,4 +1,4 @@
-namespace Ocelot.Server;
+namespace Ocelot.Web;
 
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class GetAttribute(string route) : Attribute

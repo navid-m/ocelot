@@ -1,6 +1,6 @@
-using Ocelot.Renderers.Internal;
+using Ocelot.Rendering.Internal;
 
-namespace Ocelot.Renderers.Models;
+namespace Ocelot.Rendering.Models;
 
 internal sealed class Template(string template)
 {

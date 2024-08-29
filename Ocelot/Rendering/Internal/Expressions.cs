@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Ocelot.Renderers.Internal;
+namespace Ocelot.Rendering.Internal;
 
 internal static partial class Expressions
 {

@@ -1,6 +1,6 @@
-using Ocelot.Renderers.Models;
+using Ocelot.Rendering.Models;
 
-namespace Ocelot.Renderers.Internal;
+namespace Ocelot.Rendering.Internal;
 
 internal sealed partial class BladeParser
 {

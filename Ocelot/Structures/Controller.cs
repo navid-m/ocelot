@@ -1,5 +1,5 @@
-using Ocelot.Renderers;
-using Ocelot.Renderers.Models;
+using Ocelot.Rendering;
+using Ocelot.Rendering.Models;
 using Ocelot.Responses;
 
 namespace Ocelot.Structures;

@@ -1,9 +1,9 @@
 using System.Net;
 using System.Runtime.CompilerServices;
 
-namespace Ocelot.Server.Middleware;
+namespace Ocelot.Web.Middleware;
 
-public class StaticFileMiddleware(string rootDirectory)
+public sealed class StaticFileMiddleware(string rootDirectory)
 {
     private readonly string _rootDirectory = rootDirectory;
 
