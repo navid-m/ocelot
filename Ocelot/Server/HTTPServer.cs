@@ -221,7 +221,7 @@ public sealed class App
     {
         response.ContentLength64 = responseBytes.Length;
         response.ContentEncoding = Encoding.UTF8;
-        await response.OutputStream.WriteAsync(responseBytes);
+        await response.OutputStream.WriteAsync(responseBytes).ConfigureAwait(false);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -232,7 +232,7 @@ public sealed class App
         );
         response.StatusCode = int.Parse(status.Split(' ')[0]);
         response.ContentLength64 = responseBytes.Length;
-        await response.OutputStream.WriteAsync(responseBytes);
+        await response.OutputStream.WriteAsync(responseBytes).ConfigureAwait(false);
     }
 
     public void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
