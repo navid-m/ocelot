@@ -1,19 +1,15 @@
 using System.Net;
+using System.Runtime.CompilerServices;
 
 namespace Ocelot.Server.Middleware;
 
-public class StaticFileMiddleware
+public class StaticFileMiddleware(string rootDirectory)
 {
-    private readonly string _rootDirectory;
+    private readonly string _rootDirectory = rootDirectory;
 
-    public StaticFileMiddleware(string rootDirectory)
-    {
-        _rootDirectory = rootDirectory;
-    }
-
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     public bool TryServeFile(string route, HttpListenerResponse response)
     {
-        // Convert route to file path
         string filePath = Path.Combine(
             _rootDirectory,
             route.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)
@@ -26,9 +22,7 @@ public class StaticFileMiddleware
         response.ContentType = GetContentType(Path.GetExtension(filePath));
         response.ContentLength64 = fileBytes.Length;
         response.StatusCode = (int)HttpStatusCode.OK;
-
-        using var outputStream = response.OutputStream;
-        outputStream.Write(fileBytes, 0, fileBytes.Length);
+        response.OutputStream.Write(fileBytes, 0, fileBytes.Length);
         return true;
     }
 
