@@ -163,8 +163,9 @@ public sealed class App
                 var matchedWsRoute = _wsHandlers.FirstOrDefault(h => h.IsMatch(route));
                 if (matchedWsRoute != null && context.Request.IsWebSocketRequest)
                 {
-                    var webSocketContext = await context.AcceptWebSocketAsync(subProtocol: null);
-                    await matchedWsRoute.HandleWebSocketAsync(webSocketContext.WebSocket);
+                    await matchedWsRoute.HandleWebSocketAsync(
+                        (await context.AcceptWebSocketAsync(subProtocol: null)).WebSocket
+                    );
                     return;
                 }
             }
