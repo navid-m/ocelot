@@ -2,10 +2,10 @@
 
 Dependency-free, minimal MVC web framework designed for .NET, optimized for Ahead-Of-Time (AOT) compilation. 
 
-
 ## Why
 
-ASP .NET Core does not support MVC with AOT.
+- ASP .NET Core does not support MVC with AOT.
+- It was fun writing everything from scratch.
 
 ## Running an app
 
