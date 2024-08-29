@@ -1,7 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Text;
-using Ocelot.Server.Internal;
 
 namespace Ocelot.Server.Middleware;
 
