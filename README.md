@@ -67,6 +67,10 @@ Its values can then be accessed from index.html in the Views directory like so:
 </html>
 ```
 
+Obviously, other more convoluted templating engines like Liquid, etc... can also be used.
+Though, they will void AOT compatibility.
+
+
 ## Project Structure
 
 - **Controllers**: Define routes and logic in controllers by inheriting from `Ocelot.Web.Controller`.

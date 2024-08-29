@@ -44,8 +44,8 @@ namespace Ocelot.Test
         {
             var app = new HttpServer("127.0.0.1", 8080);
             app.RegisterRoutes<HomeController>();
-            app.UseStaticFiles("Meta/Test/Static");
-            app.UseTemplatePath("Meta/Test/Views");
+            app.UseStaticFiles("Static");
+            app.UseTemplatePath("Views");
             Assert.Pass();
         }
     }
