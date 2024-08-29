@@ -143,13 +143,16 @@ public sealed class App(string ipAddress, int port)
             }
 
             var matchedRoute = Array.Find(_routes!, r => r?.IsMatch(route) ?? false);
+
             if (matchedRoute != null)
             {
                 responseBytes = matchedRoute.Invoke(
                     new HttpRequest(
                         route,
                         request.HttpMethod,
-                        request.Headers.AllKeys.ToDictionary(k => k, k => request.Headers[k]),
+                        request
+                            .Headers.AllKeys.Where(k => k != null)
+                            .ToDictionary(k => k!, k => request.Headers[k] ?? string.Empty),
                         body
                     ),
                     response
