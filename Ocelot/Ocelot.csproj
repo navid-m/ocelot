@@ -9,9 +9,10 @@
     <Title>Ocelot</Title>
     <Authors>Navid M</Authors>
     <Version>1.1.0</Version>
-    <Description>A minimal MVC web framework compatible with AOT (ahead-of-time) compiled projects</Description>
+    <Description>MVC web framework compatible with AOT (ahead-of-time) compiled projects</Description>
     <Copyright>Copyright Navid M (2024)</Copyright>
     <PackageProjectUrl>https://github.com/navid-m/ocelot/</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/navid-m/ocelot/</RepositoryUrl>
   </PropertyGroup>
 
 </Project>
