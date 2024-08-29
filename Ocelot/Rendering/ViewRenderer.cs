@@ -13,7 +13,7 @@ internal static class ViewRenderer
     static ViewRenderer()
     {
         TemplatesPath = "Views";
-        TemplateExtension = "blade";
+        TemplateExtension = "html";
     }
 
     public static View Render(ViewModel model, string viewPath)
