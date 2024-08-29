@@ -121,6 +121,7 @@ public sealed class App
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private async Task ProcessClientAsync(HttpListenerContext context)
     {
         try
