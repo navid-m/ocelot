@@ -1,53 +1,25 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Ocelot.Renderers;
 using Ocelot.Reports;
-using Ocelot.Server.Exceptions;
 using Ocelot.Server.Internal;
 using Ocelot.Server.Middleware;
 
 namespace Ocelot.Server;
 
-public sealed class App
+public sealed class App(string ipAddress, int port)
 {
-    private readonly Socket _listenerSocket;
     private RouteHandler[]? _routes;
     private StaticFileMiddleware? _staticFileMiddleware;
     private WebSocketHandler[]? _wsHandlers;
-    private readonly string _address;
-    private readonly int _usedPort;
+    private readonly string _address = ipAddress;
+    private readonly int _usedPort = port;
     private static readonly int _minBufSize = 32768;
-    private readonly byte[] _buffer = new byte[_minBufSize];
-    private readonly ConcurrentDictionary<string, byte[]> _cache = [];
-
-    public App(string ipAddress, int port)
-    {
-        _address = ipAddress;
-        _usedPort = port;
-        _listenerSocket = new Socket(
-            AddressFamily.InterNetwork,
-            SocketType.Stream,
-            ProtocolType.Tcp
-        )
-        {
-            ReceiveBufferSize = _minBufSize,
-            NoDelay = true
-        };
-        _listenerSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
-        try
-        {
-            _listenerSocket.Bind(new IPEndPoint(IPAddress.Parse(ipAddress), port));
-        }
-        catch (Exception e)
-        {
-            throw new AddressInUseException($"The address is already in use: {e.Message}");
-        }
-    }
+    private readonly ConcurrentDictionary<string, byte[]> _cache = new();
 
     public void RegisterRoutes<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)] T
@@ -95,102 +67,103 @@ public sealed class App
     public async ValueTask StartAsync()
     {
         Logger.LogInfo($"Server is at http://{_address}:{_usedPort}.", specifyNoLocation: true);
-        _listenerSocket.Listen(2048);
-        await AcceptConnectionsAsync();
-    }
 
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private async ValueTask AcceptConnectionsAsync()
-    {
-        while (true)
+        var listener = new HttpListener();
+        listener.Prefixes.Add($"http://{_address}:{_usedPort}/");
+        listener.Start();
+
+        try
         {
-            await ProcessClientAsync(
-                await Task.Factory.FromAsync(
-                    _listenerSocket.BeginAccept,
-                    _listenerSocket.EndAccept,
-                    null
-                )
-            );
+            while (true)
+            {
+                var context = await listener.GetContextAsync();
+                await ProcessClientAsync(context);
+            }
+        }
+        finally
+        {
+            listener.Stop();
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private async ValueTask ProcessClientAsync(Socket clientSocket)
+    private async ValueTask ProcessClientAsync(HttpListenerContext context)
     {
         try
         {
-            using var networkStream = new NetworkStream(clientSocket, ownsSocket: true);
-            int bytesRead = await networkStream.ReadAsync(_buffer);
-            if (bytesRead == 0)
-                return;
+            var request = context.Request;
+            var response = context.Response;
 
-            var request = ParseHttpRequest(_buffer, bytesRead);
-            if (request.Route == null)
+            // Read request body if necessary
+            string body = string.Empty;
+            if (request.HttpMethod == "POST")
             {
-                await SendErrorResponse(networkStream, "400 Bad Request");
+                using var reader = new StreamReader(request.InputStream, Encoding.UTF8);
+                body = await reader.ReadToEndAsync();
+            }
+
+            // Parse the request URL and determine route
+            string route = request.Url?.AbsolutePath ?? string.Empty;
+
+            if (route == string.Empty || request.HttpMethod == string.Empty)
+            {
+                await SendErrorResponse(response, "400 Bad Request");
                 return;
             }
 
-            if (
-                request.Method == "GET"
-                && _cache.TryGetValue(request.Route, out var cachedResponse)
-            )
+            if (request.HttpMethod == "GET" && _cache.TryGetValue(route, out byte[]? responseBytes))
             {
-                await networkStream.WriteAsync(cachedResponse);
+                await WriteResponseAsync(response, responseBytes);
                 return;
             }
 
             if (
                 _staticFileMiddleware != null
-                && _staticFileMiddleware.TryServeFile(request.Route, out var fileResponse)
+                && _staticFileMiddleware.TryServeFile(route, response)
             )
             {
-                await networkStream.WriteAsync(fileResponse);
                 return;
             }
+
             if (_wsHandlers != null)
             {
-                WebSocketHandler? matchedWsRoute;
-                try
-                {
-                    matchedWsRoute = _wsHandlers.FirstOrDefault(h => h.IsMatch(request.Route));
-                }
-                catch (Exception e)
-                {
-                    Logger.LogIssue($"Error processing websocket route: {e.Message}");
-                    throw;
-                }
+                WebSocketHandler? matchedWsRoute = _wsHandlers.FirstOrDefault(h =>
+                    h.IsMatch(route)
+                );
+
                 if (matchedWsRoute != null)
                 {
-                    var listener = new HttpListener();
-                    listener.Prefixes.Add($"http://{_address}:{_usedPort}/");
-                    listener.Start();
-
-                    HttpListenerContext context = await listener.GetContextAsync();
-
                     if (context.Request.IsWebSocketRequest)
                     {
                         var wsContext = await context.AcceptWebSocketAsync(subProtocol: null);
                         await matchedWsRoute.HandleWebSocketAsync(wsContext.WebSocket);
+                        return;
                     }
-
-                    listener.Stop();
-                    return;
                 }
             }
-            var matchedRoute = Array.Find(_routes!, r => r?.IsMatch(request.Route) ?? false);
+
+            var matchedRoute = Array.Find(_routes!, r => r?.IsMatch(route) ?? false);
             if (matchedRoute != null)
             {
-                var responseBytes = matchedRoute.Invoke(request);
-                if (request.Method == "GET" && responseBytes.Length <= _minBufSize)
+                responseBytes = matchedRoute.Invoke(
+                    new HttpRequest(
+                        route,
+                        request.HttpMethod,
+                        request.Headers.AllKeys.ToDictionary(k => k, k => request.Headers[k]),
+                        body
+                    ),
+                    response
+                );
+
+                if (request.HttpMethod == "GET" && responseBytes.Length <= _minBufSize)
                 {
-                    _cache[request.Route] = responseBytes;
+                    _cache[route] = responseBytes;
                 }
-                await networkStream.WriteAsync(responseBytes);
+                await WriteResponseAsync(response, responseBytes);
             }
             else
             {
-                await SendErrorResponse(networkStream, "404 Not Found");
+                await SendErrorResponse(response, "404 Not Found");
             }
         }
         catch (Exception e)
@@ -199,53 +172,27 @@ public sealed class App
         }
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    private static HttpRequest ParseHttpRequest(byte[] buffer, int bytesRead)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static async ValueTask WriteResponseAsync(
+        HttpListenerResponse response,
+        byte[] responseBytes
+    )
     {
-        string requestText = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-        string[] lines = requestText.Split("\r\n");
-        string[] requestLine = lines[0].Split(' ');
+        using var outputStream = response.OutputStream;
+        await outputStream.WriteAsync(responseBytes);
+    }
 
-        if (requestLine.Length < 3)
-        {
-            return new HttpRequest(null, null, [], string.Empty);
-        }
-
-        Dictionary<string, string> headers = [];
-        string method = requestLine[0];
-        int i = 1;
-
-        while (!string.IsNullOrWhiteSpace(lines[i]))
-        {
-            string[] headerParts = lines[i].Split(':', 2);
-            if (headerParts.Length == 2)
-            {
-                headers[headerParts[0].Trim()] = headerParts[1].Trim();
-            }
-            i++;
-        }
-
-        string body = string.Empty;
-        if (method == "POST" && headers.TryGetValue("Content-Length", out string? contentLength))
-        {
-            body = requestText.Substring(
-                requestText.IndexOf("\r\n\r\n") + 4,
-                int.Parse(contentLength)
-            );
-        }
-
-        return new HttpRequest(requestLine[1], method, headers, body);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static async ValueTask SendErrorResponse(HttpListenerResponse response, string status)
+    {
+        byte[] responseBytes = Encoding.UTF8.GetBytes(
+            $"HTTP/1.1 {status}\r\nContent-Type: text/plain\r\nContent-Length: {status.Length}\r\nConnection: close\r\n\r\n{status}"
+        );
+        response.StatusCode = int.Parse(status.Split(' ')[0]);
+        response.ContentLength64 = responseBytes.Length;
+        using var outputStream = response.OutputStream;
+        await outputStream.WriteAsync(responseBytes);
     }
 
     public void UseTemplatePath(string path) => ViewRenderer.SetTemplatesPath(path);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static async ValueTask SendErrorResponse(NetworkStream stream, string status)
-    {
-        await stream.WriteAsync(
-            Encoding.UTF8.GetBytes(
-                $"HTTP/1.1 {status}\r\nContent-Type: text/plain\r\nContent-Length: {status.Length}\r\nConnection: close\r\n\r\n{status}"
-            )
-        );
-    }
 }

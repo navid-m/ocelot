@@ -1,3 +1,4 @@
+using System.Net;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
@@ -49,7 +50,7 @@ internal sealed partial class RouteHandler
     public bool IsMatch(string route) => _routeRegex.IsMatch(route);
 
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    public byte[] Invoke(HttpRequest request)
+    public byte[] Invoke(HttpRequest request, HttpListenerResponse response)
     {
         Match match = _routeRegex.Match(request.Route!);
 
@@ -68,9 +69,13 @@ internal sealed partial class RouteHandler
         }
         try
         {
-            return ResponseBuilder.GenerateHttpResponse(
-                (Response)_method.Invoke(_instance, parameterValues)!
-            );
+            var responseObject = (Response)_method.Invoke(_instance, parameterValues)!;
+
+            response.ContentType = responseObject.ContentType;
+            response.ContentLength64 = responseObject.GetContent().Length;
+            response.StatusCode = (int)HttpStatusCode.OK;
+
+            return responseObject.GetContent();
         }
         catch (Exception e)
         {
