@@ -59,7 +59,7 @@ public class HomeController : Controller
 // ...
 ```
 
-Its values can then be accessed from index.html in the Views directory like so:
+Its values can then be accessed from index.html in the Views directory:
 
 ```
 <html>
