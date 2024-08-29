@@ -137,7 +137,6 @@ public sealed class App
             }
 
             string route = request.Url?.AbsolutePath ?? string.Empty;
-
             if (string.IsNullOrEmpty(route) || string.IsNullOrEmpty(request.HttpMethod))
             {
                 await SendErrorResponse(response, "400 Bad Request");
